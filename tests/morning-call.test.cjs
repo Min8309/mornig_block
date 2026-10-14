@@ -15,3 +15,8 @@ test('schedules chosen weekly days and cancels only owned previous alarms',async
 test('permission refusal preserves existing alarms and settings',async()=>{const x=native({granted:false});await assert.rejects(x.alarm.saveCall(call,'루틴'));assert.equal(x.scheduled.length,0);assert.equal(x.cancelled.length,0);assert.equal(x.saved.length,0)});
 test('partial scheduling failure removes new alarms and preserves old',async()=>{const x=native({failAt:2});await assert.rejects(x.alarm.saveCall(call,'루틴'));assert.deepEqual(x.cancelled,['new-1']);assert.equal(x.saved.length,0)});
 test('turning off cancels owned alarms without requesting permission',async()=>{const x=native({granted:false});await x.alarm.saveCall({...call,enabled:false},'루틴');assert.deepEqual(x.cancelled,['old']);assert.equal(x.requested(),0);assert.equal(x.saved[0].enabled,false)});
+
+const dial=load('src/dial-model.ts');
+test('dial maps both rotation directions and full revolutions to modules',()=>{assert.equal(dial.modeIndex(0),0);assert.equal(dial.modeIndex(-90),1);assert.equal(dial.modeIndex(-180),2);assert.equal(dial.modeIndex(-270),3);assert.equal(dial.modeIndex(-360),0);assert.equal(dial.modeIndex(90),3);assert.equal(dial.modeIndex(720),0)});
+test('dial crossing angle boundary has no full-circle jump',()=>{assert.equal(dial.shortestDelta(179,-179),2);assert.equal(dial.shortestDelta(-179,179),-2)});
+test('dial snaps to nearest category and arrows take closest path',()=>{assert.equal(dial.snapAngle(-98),-90);assert.equal(dial.snapAngle(172),180);assert.equal(dial.angleForIndex(-270,0),-360);assert.equal(dial.angleForIndex(0,3),90)});
