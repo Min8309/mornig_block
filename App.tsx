@@ -1,91 +1,1260 @@
-import React, {useEffect,useRef,useState} from 'react';
-import {Alert,AppState,Platform,Pressable,ScrollView,StyleSheet,Text,TextInput,View} from 'react-native';
-import {SafeAreaProvider,SafeAreaView} from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Speech from 'expo-speech';
-import {StatusBar} from 'expo-status-bar';
-import Blocky from './src/Blocky';
-import NewsPanel from './src/NewsPanel';
-import LanguageSettings from './src/LanguageSettings';
-import ListeningLesson from './src/ListeningLesson';
-import {StudyLanguage,StudyLevel,StudyConfig,studyConfig,studyTopic} from './src/language-lessons';
-import {playListening} from './src/language-audio';
-import {loadNews,briefing} from './src/news';
-import ReorderableModules from './src/ReorderableModules';
-import TimeStepper from './src/TimeStepper';
-import AppHeader from './src/AppHeader';
-import SettingsReveal from './src/SettingsReveal';
-import RecordsScreen from './src/RecordsScreen';
-import {RoutineRecord} from './src/records-model';
-import {formatTime} from './src/time-model';
-import ModuleDial,{BlockyActivity} from './src/ModuleDial';
-import {DialMode} from './src/dial-model';
-import BottomNavigation,{MainMenu} from './src/BottomNavigation';
-import MorningCallScreen from './src/MorningCallScreen';
-import {MorningCall,alarmKey,weekdays} from './src/alarm-model';
-import {listenForCall} from './src/alarm';
+import VoiceSettings from "./src/VoiceSettings";
+import { useEffect, useRef, useState } from "react";
+import {
+  Alert,
+  AppState,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Speech from "./src/voice";
+import { StatusBar } from "expo-status-bar";
+import Blocky from "./src/Blocky";
+import NewsPanel from "./src/NewsPanel";
+import LanguageSettings from "./src/LanguageSettings";
+import ListeningLesson from "./src/ListeningLesson";
+import {
+  StudyLanguage,
+  StudyLevel,
+  StudyConfig,
+  studyConfig,
+  studyTopic,
+} from "./src/language-lessons";
+import { playListening } from "./src/language-audio";
+import { loadNews, briefing } from "./src/news";
+import ReorderableModules from "./src/ReorderableModules";
+import TimeStepper from "./src/TimeStepper";
+import AppHeader from "./src/AppHeader";
+import SettingsReveal from "./src/SettingsReveal";
+import PodcastSettings from "./src/PodcastSettings";
+import { PodcastEpisode } from "./src/podcasts";
+import { usePodcastLibrary } from "./src/usePodcastLibrary";
+import RecordsScreen from "./src/RecordsScreen";
+import { RoutineRecord } from "./src/records-model";
+import { formatTime } from "./src/time-model";
+import ModuleDial, { BlockyActivity } from "./src/ModuleDial";
+import { DialMode } from "./src/dial-model";
+import BottomNavigation, { MainMenu } from "./src/BottomNavigation";
+import MorningCallScreen from "./src/MorningCallScreen";
+import { MorningCall, alarmKey } from "./src/alarm-model";
+import { listenForCall } from "./src/alarm";
 
-function showAlert(title:string,message:string,buttons?:Parameters<typeof Alert.alert>[2]){if(Platform.OS!=='web'){Alert.alert(title,message,buttons);return}if(buttons){if((globalThis as any).confirm(`${title}\n${message}`))buttons.find(b=>b.style!=='cancel')?.onPress?.();}else (globalThis as any).alert(`${title}\n${message}`);}
-
-type Kind='스트레칭'|'뉴스'|'영어'|'명상'|'낭독';
-type Block={id:string;kind:Kind;minutes:number;topic:string;language?:StudyLanguage;level?:StudyLevel};
-type Routine={id:string;name:string;time:string;blocks:Block[]};
-type RecordItem=RoutineRecord;
-const options:Record<Kind,string[]>={'스트레칭':['가볍게 몸 풀기','목·어깨 풀기'],'뉴스':['정치','경제','사회','생활/문화','IT/과학','세계'],'영어':['영어 · 초급 리스닝'],'명상':['호흡에 집중','감사하는 아침'],'낭독':['오늘의 짧은 글','하루의 질문']};
-const blockName=(b:Block)=>b.kind==='영어'?'외국어':b.kind;
-const blockTopic=(b:Block)=>b.kind==='영어'?studyTopic(studyConfig(b)):b.topic;
-const withStudy=(b:Block,c:StudyConfig)=>({...b,...c,topic:studyTopic(c)});
-const icons:Record<Kind,string>={'스트레칭':'↗','뉴스':'≋','영어':'Aa','명상':'◎','낭독':'▤'};
-const initial:Routine[]=[{id:'weekday',name:'출근 전, 나를 위한 아침',time:'07:00',blocks:[{id:'a',kind:'스트레칭',minutes:5,topic:options['스트레칭'][0]},{id:'b',kind:'뉴스',minutes:5,topic:'경제'},{id:'c',kind:'영어',minutes:3,topic:options['영어'][0]},{id:'d',kind:'명상',minutes:2,topic:options['명상'][0]}]}];
-const sum=(b:Block[])=>b.reduce((s,x)=>s+x.minutes,0);
-const endTime=(t:string,n:number)=>{const [h,m]=t.split(':').map(Number);const v=(h*60+m+n)%1440;return `${String(Math.floor(v/60)).padStart(2,'0')}:${String(v%60).padStart(2,'0')}`};
-const key='morningblock.v1';
-function guide(b:Block){switch(b.kind){case '스트레칭':return '천천히 몸을 일으켜 주세요. 편안한 범위에서 어깨를 뒤로 돌리고, 양팔을 가볍게 뻗어 보세요. 통증이 느껴지면 멈추고 쉬세요.';case '뉴스':return '선택한 분야의 공개 RSS 뉴스를 불러오고 있어요.';case '영어':return "오늘의 표현은 Take your time. 서두르지 않아도 괜찮아요라는 뜻입니다. 천천히 따라 말해 보세요. Take your time.";case '명상':return '편안하게 앉아 숨을 자연스럽게 쉬어 주세요. 호흡을 억지로 바꾸지 않고, 들어오고 나가는 숨을 느껴 보세요. 잠시 조용히 함께합니다.';case '낭독':return '오늘의 짧은 글입니다. 하루를 시작하는 속도는 모두 다릅니다. 오늘 내게 필요한 한 가지를 떠올려 보세요. 작게 시작해도 괜찮습니다.'}}
-export default function App(){
- const scrollRef=useRef<ScrollView>(null),scrollOffset=useRef(0),scrollMax=useRef(0),scrollHeight=useRef(0),contentHeight=useRef(0);
- const [moduleDragging,setModuleDragging]=useState(false),[studyError,setStudyError]=useState('');
- const autoScroll=(delta:number)=>{const next=Math.max(0,Math.min(scrollMax.current,scrollOffset.current+delta));const moved=next-scrollOffset.current;scrollOffset.current=next;scrollRef.current?.scrollTo({y:next,animated:false});return moved};
- const [dialDragging,setDialDragging]=useState(false);
- const [settingsMode,setSettingsMode]=useState<DialMode|null>(null);
- const [previewMode,setPreviewMode]=useState<DialMode>('스트레칭'),[expandedBlock,setExpandedBlock]=useState<string|null>(null);
- const [call,setCall]=useState<MorningCall>({enabled:false,time:'07:00',days:[2,3,4,5,6],routineId:'weekday',sound:true}),[callOpen,setCallOpen]=useState(false);
- useEffect(()=>{AsyncStorage.getItem(alarmKey).then(v=>{if(v){const c=JSON.parse(v);if(typeof c.enabled==='boolean'&&typeof c.time==='string'&&Array.isArray(c.days))setCall(c);}}).catch(()=>showAlert('모닝콜 설정','저장된 모닝콜 설정을 불러오지 못했어요.'));},[]);
- const [routines,setRoutines]=useState<Routine[]>(initial),[selected,setSelected]=useState('weekday'),[records,setRecords]=useState<RecordItem[]>([]),[ready,setReady]=useState(false),[tab,setTab]=useState<'오늘'|'내 루틴'|'기록'>('오늘');
- const [draft,setDraft]=useState<Routine|null>(null),[today,setToday]=useState<Routine|null>(null),[todayOnly,setTodayOnly]=useState(false),[playing,setPlaying]=useState(false),[paused,setPaused]=useState(false),[index,setIndex]=useState(0),[remaining,setRemaining]=useState(0),[session,setSession]=useState<Routine|null>(null),[done,setDone]=useState(false);
- const deadline=useRef(0),pausedRemaining=useRef(0),spoken=useRef(''),generation=useRef(0),skipped=useRef(false),startedAt=useRef(0),pausedAt=useRef(0),pausedTime=useRef(0);
- const base=routines.find(r=>r.id===selected)||routines[0]; const active=today?.id===base.id?today:base;
- useEffect(()=>{AsyncStorage.getItem(key).then(v=>{if(v){const d=JSON.parse(v);if(Array.isArray(d.routines)&&d.routines.length){setRoutines(d.routines.map((r:Routine)=>({...r,blocks:r.blocks.map(b=>b.kind==='뉴스'?{...b,topic:b.topic==='문화'?'생활/문화':b.topic==='IT·기술'?'IT/과학':b.topic}:b)})));setSelected(d.selected||d.routines[0].id);setRecords(d.records||[])}}}).catch(()=>showAlert('저장 정보','저장된 설정을 불러오지 못했어요.')).finally(()=>setReady(true));return()=>{Speech.stop()};},[]);
- useEffect(()=>{if(ready)AsyncStorage.setItem(key,JSON.stringify({routines,selected,records})).catch(()=>showAlert('저장 실패','기기의 저장 공간을 확인해 주세요.'));},[routines,selected,records,ready]);
- useEffect(()=>{if(!ready)return;return listenForCall(id=>{if(routines.some(r=>r.id===id)){setSelected(id);setToday(null);setTab('오늘');setCallOpen(false);setDraft(null);showAlert('좋은 아침이에요','연결된 모닝 루틴을 준비했어요. 시작 버튼을 눌러 주세요.');}});},[ready,routines]);
- const finish=()=>{Speech.stop();setPlaying(false);setDone(true);if(session&&!skipped.current)setRecords(v=>[{date:new Date().toISOString(),minutes:sum(session.blocks),name:session.name,actualSeconds:Math.max(0,(Date.now()-startedAt.current-pausedTime.current-(pausedAt.current?Date.now()-pausedAt.current:0))/1000)},...v]);setToday(null)};
- const enter=(i:number,s:Routine)=>{Speech.stop();generation.current++;if(i>=s.blocks.length){finish();return}setIndex(i);const seconds=s.blocks[i].minutes*60;setRemaining(seconds);deadline.current=Date.now()+seconds*1000;setPaused(false);spoken.current='';};
- useEffect(()=>{if(!playing||paused||!session)return;const b=session.blocks[index];const id=`${generation.current}-${index}`;let alive=true;let stopListening:(()=>void)|undefined;const controller=new AbortController();if(b.kind==='영어'){spoken.current=id;setStudyError('');stopListening=playListening(studyConfig(b),message=>{if(alive)setStudyError(message)});}else if(b.kind==='뉴스'){spoken.current=id;loadNews(b.topic,controller.signal).then(feed=>{if(alive)Speech.speak(briefing(feed,b.minutes),{language:'ko-KR',rate:0.88})}).catch(()=>{if(alive)Speech.speak('뉴스를 불러오지 못했어요. 네트워크를 확인하거나 다음 모듈로 이동해 주세요.',{language:'ko-KR'})});}else if(spoken.current!==id){spoken.current=id;Speech.speak(`${b.kind}, ${b.minutes}분을 시작합니다. ${guide(b)}`,{language:'ko-KR',rate:0.88})}const update=()=>{const left=Math.max(0,Math.ceil((deadline.current-Date.now())/1000));setRemaining(left);if(!left)enter(index+1,session)};const timer=setInterval(update,500);const subscription=AppState.addEventListener('change',state=>{if(state==='active')update()});return()=>{alive=false;stopListening?.();controller.abort();clearInterval(timer);subscription.remove()};},[playing,paused,index,session]);
-
- const start=()=>{if(!active.blocks.length)return;startedAt.current=Date.now();pausedAt.current=0;pausedTime.current=0;skipped.current=false;setSession(JSON.parse(JSON.stringify(active)));setDone(false);setIndex(0);setRemaining(active.blocks[0].minutes*60);deadline.current=Date.now()+active.blocks[0].minutes*60000;generation.current++;spoken.current='';setPaused(false);setPlaying(true)};
- const pause=()=>{if(paused){if(pausedAt.current)pausedTime.current+=Date.now()-pausedAt.current;pausedAt.current=0;deadline.current=Date.now()+pausedRemaining.current*1000;setPaused(false)}else{pausedAt.current=Date.now();pausedRemaining.current=remaining;Speech.stop();setPaused(true)}};
- const edit=(only=false)=>{setDraft(JSON.parse(JSON.stringify(only?active:base)));setTodayOnly(only)};
- const createRoutine=()=>{const r={id:String(Date.now()),name:'여유 있는 아침',time:'08:00',blocks:[{id:String(Date.now()),kind:'명상' as Kind,minutes:5,topic:options['명상'][0]}]};setRoutines(v=>[...v,r]);setSelected(r.id);setCallOpen(false);setTab('내 루틴');setDraft(r);setTodayOnly(false)};
- const selectMenu=(menu:MainMenu)=>{if(menu==='모닝콜')setCallOpen(true);else{setCallOpen(false);setTab(menu)}};
- const selectDialMode=(mode:DialMode)=>{setPreviewMode(mode);setSettingsMode(mode);const block=active.blocks.find(b=>b.kind===mode&&b.id===expandedBlock)||active.blocks.find(b=>b.kind===mode);setExpandedBlock(mode==='뉴스'?null:block?.id??null)};
- const addMode=(kind:DialMode,minutes:number)=>{const block={id:`${Date.now()}-${Math.random()}`,kind,minutes,topic:options[kind][0]};if(draft)setDraft({...draft,blocks:[...draft.blocks,block]});else{setDraft({...base,blocks:[...base.blocks,block]});setTodayOnly(false)};};
- const patch=(id:string,fn:(b:Block)=>Block)=>setDraft(d=>d&&({...d,blocks:d.blocks.map(b=>b.id===id?fn(b):b)}));
- const save=()=>{if(!draft)return;const normalized={...draft,time:formatTime(draft.time)};if(!draft.name.trim()||!/^([01]\d|2[0-3]):[0-5]\d$/.test(normalized.time)||!draft.blocks.length){showAlert('설정을 확인해 주세요','이름, 루틴 시작 예정 시간, 하나 이상의 모듈이 필요해요.');return}if(todayOnly)setToday(normalized);else{setRoutines(v=>v.map(r=>r.id===draft.id?normalized:r));setToday(null)}setDraft(null)};
- const button=(label:string,fn:()=>void,secondary=false)=><Pressable accessibilityRole="button" onPress={fn} style={[styles.button,secondary&&styles.secondary]}><Text style={[styles.buttonText,secondary&&{color:'#245C56'}]}>{label}</Text></Pressable>;
- const updateHomeBlock=(id:string,fn:(b:Block)=>Block)=>{if(today?.id===base.id)setToday({...today,blocks:today.blocks.map(b=>b.id===id?fn(b):b)});else setRoutines(v=>v.map(r=>r.id===base.id?{...r,blocks:r.blocks.map(b=>b.id===id?fn(b):b)}:r));};
- const blockCard=(b:Block,i:number)=><View key={b.id} style={[styles.card,expandedBlock===b.id&&styles.selectedCard]}><Pressable accessibilityRole="button" accessibilityLabel={`${blockName(b)} 설정 ${expandedBlock===b.id?'접기':'펼치기'}`} accessibilityState={{expanded:expandedBlock===b.id}} onPress={()=>{if(b.kind!=='낭독')setPreviewMode(b.kind);setExpandedBlock(v=>v===b.id?null:b.id)}} style={styles.row}><Text style={styles.icon}>{icons[b.kind]}</Text><View style={{flex:1}}><Text style={styles.cardTitle}>{blockName(b)}</Text><Text style={styles.muted}>{blockTopic(b)}</Text></View><Text style={styles.cardTitle}>{b.minutes}분</Text><View style={{width:44,height:44,alignItems:'center',justifyContent:'center',backgroundColor:'#EDF3EF',borderRadius:12}}><Text style={[styles.link,{fontSize:20}]}>{expandedBlock===b.id?'⌃':'⌄'}</Text></View></Pressable>{expandedBlock===b.id&&<SettingsReveal><View style={styles.row}><Text style={styles.label}>모듈 시간</Text><View style={styles.row}>{button('−',()=>updateHomeBlock(b.id,x=>({...x,minutes:Math.max(1,x.minutes-1)})),true)}<Text style={styles.cardTitle}>{b.minutes}분</Text>{button('+',()=>updateHomeBlock(b.id,x=>({...x,minutes:Math.min(30,x.minutes+1)})),true)}</View></View>{b.kind==='영어'?<LanguageSettings config={studyConfig(b)} onChange={c=>updateHomeBlock(b.id,x=>withStudy(x,c))}/>:<View style={styles.chips}>{options[b.kind].map(topic=><Pressable key={topic} onPress={()=>updateHomeBlock(b.id,x=>({...x,topic}))} style={[styles.chip,b.topic===topic&&styles.chipSelected]}><Text style={{color:b.topic===topic?'white':'#245C56'}}>{topic}</Text></Pressable>)}</View>}<Text style={styles.notice}>{today?.id===base.id?'오늘 루틴에 바로 반영돼요.':'기본 루틴에 자동 저장돼요.'}</Text></SettingsReveal>}</View>;
- if(!ready)return <SafeAreaProvider><SafeAreaView style={styles.root}><Text style={styles.title}>모닝블록</Text></SafeAreaView></SafeAreaProvider>;
- return <SafeAreaProvider><SafeAreaView style={styles.root}><StatusBar style="dark"/><AppHeader minutes={sum(active.blocks)} blocks={active.blocks.length} editingDisabled={!!draft||playing} onEdit={()=>{setCallOpen(false);setDone(false);edit(true)}}/>
- <ScrollView ref={scrollRef} scrollEnabled={!dialDragging&&!moduleDragging} scrollEventThrottle={16} onScroll={e=>{scrollOffset.current=e.nativeEvent.contentOffset.y}} onLayout={e=>{scrollHeight.current=e.nativeEvent.layout.height;scrollMax.current=Math.max(0,contentHeight.current-scrollHeight.current)}} onContentSizeChange={(_w,h)=>{contentHeight.current=h;scrollMax.current=Math.max(0,h-scrollHeight.current)}} contentContainerStyle={styles.content}>
- {callOpen?<MorningCallScreen call={{...call,routineId:routines.some(r=>r.id===call.routineId)?call.routineId:base.id}} routines={routines} onSave={setCall} onClose={()=>setCallOpen(false)}/>:draft?<><Text style={styles.eyebrow}>{todayOnly?'오늘만 변경':'루틴 편집'}</Text><Text style={styles.title}>내 아침을 조립해요</Text><Text style={styles.label}>루틴 이름</Text><TextInput accessibilityLabel="루틴 이름" style={styles.input} value={draft.name} onChangeText={name=>setDraft({...draft,name})}/><Text style={styles.label}>루틴 시작 예정 시간 · 24시간 형식</Text><TimeStepper label="루틴 시작 예정 시간" value={draft.time} onChange={time=>setDraft({...draft,time})}/>
- <Text style={styles.notice}>루틴 시작 예정 시간이에요. 모닝콜 시간과 반복 요일은 홈의 모닝콜 설정에서 따로 정할 수 있어요.</Text>
- <ReorderableModules items={draft.blocks} onChange={blocks=>setDraft(d=>d?{...d,blocks}:d)} onDragState={setModuleDragging} scrollRef={scrollRef} scrollOffset={scrollOffset} onAutoScroll={autoScroll} renderItem={(b,handle)=><View style={styles.card}><View style={styles.row}>{handle}<Text style={styles.icon}>{icons[b.kind]}</Text><Text style={[styles.cardTitle,{flex:1}]}>{blockName(b)}</Text><Pressable accessibilityLabel={`${b.kind} 삭제`} onPress={()=>setDraft({...draft,blocks:draft.blocks.filter(x=>x.id!==b.id)})}><Text style={styles.link}>삭제</Text></Pressable></View><View style={styles.row}>{button('−',()=>patch(b.id,x=>({...x,minutes:Math.max(1,x.minutes-1)})),true)}<Text style={styles.cardTitle}>{b.minutes}분</Text>{button('+',()=>patch(b.id,x=>({...x,minutes:Math.min(30,x.minutes+1)})),true)}</View>{b.kind==='영어'?<LanguageSettings config={studyConfig(b)} onChange={c=>patch(b.id,x=>withStudy(x,c))}/>:<View style={styles.chips}>{options[b.kind].map(topic=><Pressable key={topic} onPress={()=>patch(b.id,x=>({...x,topic}))} style={[styles.chip,b.topic===topic&&styles.chipSelected]}><Text style={{color:b.topic===topic?'white':'#245C56'}}>{topic}</Text></Pressable>)}</View>}</View>}/>
-
- <Text style={styles.label}>모듈 추가</Text><View style={styles.chips}>{(['스트레칭','뉴스','영어','명상'] as DialMode[]).map(kind=><Pressable key={kind} style={styles.chip} onPress={()=>addMode(kind,5)}><Text style={styles.link}>+ {kind==='영어'?'외국어':kind}</Text></Pressable>)}</View>{button('+ 낭독 추가',()=>setDraft({...draft,blocks:[...draft.blocks,{id:`${Date.now()}-${Math.random()}`,kind:'낭독',minutes:3,topic:options['낭독'][0]}]}),true)}<Text style={styles.total}>총 {sum(draft.blocks)}분</Text>{button('루틴 저장',save)}{button('취소',()=>setDraft(null),true)}</>:
- playing&&session?<><Text style={styles.eyebrow}>지금은 나를 위한 시간</Text><Text style={styles.title}>{blockName(session.blocks[index])}</Text><Text style={styles.muted}>{blockTopic(session.blocks[index])} · {index+1}/{session.blocks.length}</Text>{paused||session.blocks[index].kind==='낭독'?<Blocky compact mood={paused?'sleep':'awake'}/>:<BlockyActivity compact language={studyConfig(session.blocks[index]).language} mode={session.blocks[index].kind as DialMode}/>}<View style={styles.timerCircle}><Text style={styles.timer}>{Math.floor(remaining/60)}:{String(remaining%60).padStart(2,'0')}</Text><Text style={styles.muted}>{paused?'잠시 쉬는 중':'남은 시간'}</Text></View><Text style={styles.description}>휴대폰을 내려놓고{ '\n'}내 아침에 집중해요.</Text><Text style={styles.notice}>뉴스는 공개 RSS 제목·소개문을 읽어드려요. 낭독이 끝나면 남은 시간은 준비 시간으로 사용할 수 있어요. 외국어는 선택한 언어·단계의 리스닝 레슨으로 진행해요.</Text>{session.blocks[index].kind==='영어'&&<><ListeningLesson key={`${session.blocks[index].id}-${session.blocks[index].language}-${session.blocks[index].level}`} config={studyConfig(session.blocks[index])}/>{studyError&&<Text style={styles.notice}>{studyError}</Text>}</>}{session.blocks[index].kind==='뉴스'&&<NewsPanel category={session.blocks[index].topic} minutes={session.blocks[index].minutes} allowPlayback={false}/>}{button(paused?'이어서 진행':'일시정지',pause)}{button('다음 모듈',()=>{skipped.current=true;enter(index+1,session)},true)}{button('루틴 종료',()=>showAlert('루틴을 마칠까요?','중단한 루틴은 완료 기록에 포함하지 않아요.',[{text:'계속하기',style:'cancel'},{text:'종료',onPress:()=>{Speech.stop();setPlaying(false)}}]),true)}</>:
- done?<><Text style={styles.eyebrow}>오늘의 작은 시작</Text><Text style={styles.title}>좋은 아침을 만들었어요</Text><Blocky mood="complete"/><View style={styles.hero}><Text style={styles.heroIcon}>☀</Text><Text style={styles.total}>{skipped.current?'루틴을 마쳤어요':`${session?sum(session.blocks):0}분 함께했어요`}</Text><Text style={styles.description}>이제 나만의 속도로{ '\n'}하루를 시작하세요.</Text></View>{button('오늘 화면으로',()=>setDone(false))}</>:
- tab==='오늘'?<><ModuleDial language={studyConfig(active.blocks.find(b=>b.kind==='영어'&&b.id===expandedBlock)||active.blocks.find(b=>b.kind==='영어')||{}).language} greeting="Good morning!" activeMode={previewMode} onModeChange={mode=>{setPreviewMode(mode);setSettingsMode(null);setExpandedBlock(null)}} onModeSelect={selectDialMode} showBuilder={false} onDragState={setDialDragging} onAdd={addMode}/><View style={styles.row}><Text style={styles.section}>{settingsMode?`${settingsMode==='영어'?'외국어':settingsMode} 설정`:'다이얼에서 모드를 선택해 주세요'}</Text><Pressable onPress={()=>edit(true)}><Text style={styles.link}>오늘만 수정 →</Text></Pressable></View>{settingsMode&&active.blocks.filter(b=>b.kind===settingsMode).slice(0,1).map(blockCard)}{settingsMode==='뉴스'&&active.blocks.filter(b=>b.id===expandedBlock&&b.kind==='뉴스').map(b=><NewsPanel key={b.id} category={b.topic} minutes={b.minutes}/>)}{settingsMode&&!active.blocks.some(b=>b.kind===settingsMode)&&<View style={styles.card}><Text style={styles.muted}>이 모드는 아직 루틴에 없어요.</Text>{button(`＋ ${settingsMode==='영어'?'외국어':settingsMode} 루틴 추가`,()=>addMode(settingsMode,5))}</View>}{button('▶  내 아침 시작하기',start)}<Text style={styles.notice}>뉴스는 뉴시스 공개 RSS와 연결돼요. 외국어는 언어·단계별 기본 리스닝 레슨을 제공해요. 모닝콜은 휴대폰 앱에서 예약 알림으로 동작해요.</Text></>:
- tab==='내 루틴'?<><Text style={styles.eyebrow}>원하는 만큼, 원하는 순서로</Text><Text style={styles.title}>내 아침 컬렉션</Text>{routines.map(r=><Pressable key={r.id} style={[styles.card,r.id===selected&&styles.selectedCard]} onPress={()=>{setSelected(r.id);setToday(null)}}><Text style={styles.cardTitle}>{r.id===selected?'● ':'○ '}{r.name}</Text><Text style={styles.muted}>{r.time} · {sum(r.blocks)}분 · {r.blocks.length}개 블록</Text></Pressable>)}{button('선택한 루틴 편집',()=>edit())}{button('+ 새 루틴 만들기',createRoutine,true)}{routines.length>1&&button('선택한 루틴 삭제',()=>showAlert('루틴 삭제','이 루틴을 삭제할까요?',[{text:'취소',style:'cancel'},{text:'삭제',style:'destructive',onPress:()=>{if(call.enabled&&call.routineId===selected){showAlert('모닝콜에 연결된 루틴','먼저 모닝콜을 끄거나 다른 루틴으로 연결해 주세요.');return;}setRoutines(v=>v.filter(r=>r.id!==selected));setSelected(routines.find(r=>r.id!==selected)!.id);setToday(null)}}]),true)}</>:
- <RecordsScreen records={records}/>}
- </ScrollView>{!draft&&!playing&&!done&&<BottomNavigation active={callOpen?'모닝콜':tab} onSelect={selectMenu} onCreate={createRoutine}/>}</SafeAreaView></SafeAreaProvider>
+function showAlert(
+  title: string,
+  message: string,
+  buttons?: Parameters<typeof Alert.alert>[2],
+) {
+  if (Platform.OS !== "web") {
+    Alert.alert(title, message, buttons);
+    return;
+  }
+  if (buttons) {
+    if ((globalThis as any).confirm(`${title}\n${message}`))
+      buttons.find((b) => b.style !== "cancel")?.onPress?.();
+  } else (globalThis as any).alert(`${title}\n${message}`);
 }
-const styles=StyleSheet.create({root:{flex:1,backgroundColor:'#F7F4EE',width:'100%',maxWidth:480,alignSelf:'center'},brand:{paddingHorizontal:24,paddingVertical:16,flexDirection:'row',justifyContent:'space-between',alignItems:'center'},logo:{fontSize:19,fontWeight:'800',color:'#245C56'},content:{padding:24,paddingTop:12,paddingBottom:36,gap:14},eyebrow:{color:'#245C56',fontSize:13,fontWeight:'600'},title:{fontSize:30,lineHeight:42,fontWeight:'800',color:'#252D2B',marginBottom:8},hero:{backgroundColor:'#EEE9DF',borderRadius:28,padding:26,gap:12},heroIcon:{fontSize:45,color:'#B76735'},heroTitle:{fontSize:17,fontWeight:'600',color:'#252D2B'},total:{fontSize:36,fontWeight:'800',color:'#245C56'},muted:{fontSize:13,lineHeight:21,color:'#626C67'},row:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:12},section:{fontSize:18,fontWeight:'700',color:'#252D2B'},card:{backgroundColor:'#FFFFFF',padding:20,borderRadius:20,gap:14},cardTitle:{fontSize:17,fontWeight:'700',color:'#252D2B'},icon:{width:44,height:44,textAlign:'center',textAlignVertical:'center',lineHeight:44,backgroundColor:'#EDF3EF',borderRadius:14,color:'#245C56',fontSize:22,fontWeight:'600'},link:{color:'#245C56',fontSize:14,fontWeight:'600'},button:{minHeight:52,paddingHorizontal:22,paddingVertical:16,backgroundColor:'#245C56',borderRadius:16,alignItems:'center'},buttonText:{color:'white',fontWeight:'700',fontSize:16},secondary:{backgroundColor:'#E8EEE9'},notice:{fontSize:12,color:'#626C67',lineHeight:19},label:{fontSize:14,color:'#252D2B',fontWeight:'600'},input:{backgroundColor:'white',borderRadius:14,padding:16,fontSize:16,color:'#252D2B'},chips:{flexDirection:'row',flexWrap:'wrap',gap:8},chip:{padding:12,borderRadius:12,backgroundColor:'#E8EEE9',minHeight:44},chipSelected:{backgroundColor:'#245C56'},selectedCard:{borderWidth:2,borderColor:'#245C56'},timerCircle:{alignSelf:'center',width:250,height:250,borderRadius:125,backgroundColor:'#EEE9DF',alignItems:'center',justifyContent:'center',marginVertical:26,gap:12},timer:{fontSize:56,fontWeight:'700',color:'#245C56'},description:{textAlign:'center',fontSize:18,lineHeight:29,color:'#252D2B'}});
+
+type Kind = "스트레칭" | "뉴스" | "영어" | "명상" | "낭독" | "팟캐스트";
+type Block = {
+  id: string;
+  kind: Kind;
+  minutes: number;
+  topic: string;
+  language?: StudyLanguage;
+  level?: StudyLevel;
+  podcastId?: string;
+  episodeId?: string;
+  episode?: PodcastEpisode;
+};
+type Routine = { id: string; name: string; time: string; blocks: Block[] };
+type RecordItem = RoutineRecord;
+const options: Record<Kind, string[]> = {
+  스트레칭: ["가볍게 몸 풀기", "목·어깨 풀기"],
+  뉴스: ["정치", "경제", "사회", "생활/문화", "IT/과학", "세계"],
+  영어: ["영어 · 초급 리스닝"],
+  명상: ["호흡에 집중", "감사하는 아침"],
+  팟캐스트: ["BBC · 6 Minute English"],
+  낭독: ["오늘의 짧은 글", "하루의 질문"],
+};
+const blockName = (b: Block) => (b.kind === "영어" ? "외국어" : b.kind);
+const blockTopic = (b: Block) =>
+  b.kind === "영어" ? studyTopic(studyConfig(b)) : b.topic;
+const withStudy = (b: Block, c: StudyConfig) => ({
+  ...b,
+  ...c,
+  topic: studyTopic(c),
+});
+const icons: Record<Kind, string> = {
+  스트레칭: "↗",
+  뉴스: "≋",
+  영어: "Aa",
+  명상: "◎",
+  팟캐스트: "♫",
+  낭독: "▤",
+};
+const initial: Routine[] = [
+  {
+    id: "weekday",
+    name: "출근 전, 나를 위한 아침",
+    time: "07:00",
+    blocks: [
+      { id: "a", kind: "스트레칭", minutes: 5, topic: options["스트레칭"][0] },
+      { id: "b", kind: "뉴스", minutes: 5, topic: "경제" },
+      { id: "c", kind: "영어", minutes: 3, topic: options["영어"][0] },
+      { id: "d", kind: "명상", minutes: 2, topic: options["명상"][0] },
+    ],
+  },
+];
+const sum = (b: Block[]) => b.reduce((s, x) => s + x.minutes, 0);
+const key = "morningblock.v1";
+function guide(b: Block) {
+  switch (b.kind) {
+    case "스트레칭":
+      return "천천히 몸을 일으켜 주세요. 편안한 범위에서 어깨를 뒤로 돌리고, 양팔을 가볍게 뻗어 보세요. 통증이 느껴지면 멈추고 쉬세요.";
+    case "뉴스":
+      return "선택한 분야의 공개 RSS 뉴스를 불러오고 있어요.";
+    case "영어":
+      return "오늘의 표현은 Take your time. 서두르지 않아도 괜찮아요라는 뜻입니다. 천천히 따라 말해 보세요. Take your time.";
+    case "명상":
+      return "편안하게 앉아 숨을 자연스럽게 쉬어 주세요. 호흡을 억지로 바꾸지 않고, 들어오고 나가는 숨을 느껴 보세요. 잠시 조용히 함께합니다.";
+    case "낭독":
+      return "오늘의 짧은 글입니다. 하루를 시작하는 속도는 모두 다릅니다. 오늘 내게 필요한 한 가지를 떠올려 보세요. 작게 시작해도 괜찮습니다.";
+  }
+}
+export default function App() {
+  const {
+    sources: podcastSources,
+    setSources: setPodcastSources,
+    error: podcastLibraryError,
+  } = usePodcastLibrary();
+  const [podcastLibraryOpen, setPodcastLibraryOpen] = useState(false);
+
+  const scrollRef = useRef<ScrollView>(null),
+    scrollOffset = useRef(0),
+    scrollMax = useRef(0),
+    scrollHeight = useRef(0),
+    contentHeight = useRef(0);
+  const [moduleDragging, setModuleDragging] = useState(false),
+    [studyError, setStudyError] = useState("");
+  const autoScroll = (delta: number) => {
+    const next = Math.max(
+      0,
+      Math.min(scrollMax.current, scrollOffset.current + delta),
+    );
+    const moved = next - scrollOffset.current;
+    scrollOffset.current = next;
+    scrollRef.current?.scrollTo({ y: next, animated: false });
+    return moved;
+  };
+  const [dialDragging, setDialDragging] = useState(false);
+  const [settingsMode, setSettingsMode] = useState<DialMode | null>(null);
+  const [previewMode, setPreviewMode] = useState<DialMode>("스트레칭"),
+    [expandedBlock, setExpandedBlock] = useState<string | null>(null);
+  const [call, setCall] = useState<MorningCall>({
+      enabled: false,
+      time: "07:00",
+      days: [2, 3, 4, 5, 6],
+      routineId: "weekday",
+      sound: true,
+    }),
+    [callOpen, setCallOpen] = useState(false);
+  useEffect(() => {
+    AsyncStorage.getItem(alarmKey)
+      .then((v) => {
+        if (v) {
+          const c = JSON.parse(v);
+          if (
+            typeof c.enabled === "boolean" &&
+            typeof c.time === "string" &&
+            Array.isArray(c.days)
+          )
+            setCall(c);
+        }
+      })
+      .catch(() =>
+        showAlert("모닝콜 설정", "저장된 모닝콜 설정을 불러오지 못했어요."),
+      );
+  }, []);
+  const [routines, setRoutines] = useState<Routine[]>(initial),
+    [selected, setSelected] = useState("weekday"),
+    [records, setRecords] = useState<RecordItem[]>([]),
+    [ready, setReady] = useState(false),
+    [tab, setTab] = useState<"오늘" | "내 루틴" | "기록">("오늘");
+  const [podcastCueReady, setPodcastCueReady] = useState(false);
+  const [draft, setDraft] = useState<Routine | null>(null),
+    [today, setToday] = useState<Routine | null>(null),
+    [todayOnly, setTodayOnly] = useState(false),
+    [playing, setPlaying] = useState(false),
+    [paused, setPaused] = useState(false),
+    [index, setIndex] = useState(0),
+    [remaining, setRemaining] = useState(0),
+    [session, setSession] = useState<Routine | null>(null),
+    [done, setDone] = useState(false);
+  const deadline = useRef(0),
+    pausedRemaining = useRef(0),
+    spoken = useRef(""),
+    generation = useRef(0),
+    skipped = useRef(false),
+    startedAt = useRef(0),
+    pausedAt = useRef(0),
+    pausedTime = useRef(0);
+  const base = routines.find((r) => r.id === selected) || routines[0];
+  const active = today?.id === base.id ? today : base;
+  useEffect(() => {
+    void Speech.loadVoiceChoices().catch(() => {});
+    AsyncStorage.getItem(key)
+      .then((v) => {
+        if (v) {
+          const d = JSON.parse(v);
+          if (Array.isArray(d.routines) && d.routines.length) {
+            setRoutines(
+              d.routines.map((r: Routine) => ({
+                ...r,
+                blocks: r.blocks.map((b) =>
+                  b.kind === "뉴스"
+                    ? {
+                        ...b,
+                        topic:
+                          b.topic === "문화"
+                            ? "생활/문화"
+                            : b.topic === "IT·기술"
+                              ? "IT/과학"
+                              : b.topic,
+                      }
+                    : b,
+                ),
+              })),
+            );
+            setSelected(d.selected || d.routines[0].id);
+            setRecords(d.records || []);
+          }
+        }
+      })
+      .catch(() => showAlert("저장 정보", "저장된 설정을 불러오지 못했어요."))
+      .finally(() => setReady(true));
+    return () => {
+      Speech.stop();
+    };
+  }, []);
+  useEffect(() => {
+    if (ready)
+      AsyncStorage.setItem(
+        key,
+        JSON.stringify({ routines, selected, records }),
+      ).catch(() =>
+        showAlert("저장 실패", "기기의 저장 공간을 확인해 주세요."),
+      );
+  }, [routines, selected, records, ready]);
+  useEffect(() => {
+    if (!ready) return;
+    return listenForCall((id) => {
+      const target = routines.find((r) => r.id === id);
+      if (target) {
+        setPodcastLibraryOpen(false);
+        setSelected(id);
+        setToday(null);
+        setTab("오늘");
+        setCallOpen(false);
+        setDraft(null);
+        beginRoutine(target);
+      }
+    });
+  }, [ready, routines]);
+  const finish = () => {
+    Speech.stop();
+    setPlaying(false);
+    setDone(true);
+    if (session && !skipped.current)
+      setRecords((v) => [
+        {
+          date: new Date().toISOString(),
+          minutes: sum(session.blocks),
+          name: session.name,
+          actualSeconds: Math.max(
+            0,
+            (Date.now() -
+              startedAt.current -
+              pausedTime.current -
+              (pausedAt.current ? Date.now() - pausedAt.current : 0)) /
+              1000,
+          ),
+        },
+        ...v,
+      ]);
+    setToday(null);
+  };
+  useEffect(() => {
+    if (done) {
+      Speech.speak("오늘의 아침 루틴을 마쳤어요. 좋은 하루 보내세요.", {
+        language: "ko-KR",
+      });
+      return () => {
+        Speech.stop();
+      };
+    }
+  }, [done]);
+  const enter = (i: number, s: Routine) => {
+    Speech.stop();
+    generation.current++;
+    if (i >= s.blocks.length) {
+      finish();
+      return;
+    }
+    setIndex(i);
+    const seconds = s.blocks[i].minutes * 60;
+    setRemaining(seconds);
+    deadline.current = Date.now() + seconds * 1000;
+    setPaused(false);
+    spoken.current = "";
+  };
+  useEffect(() => {
+    if (!playing || paused || !session) return;
+    const b = session.blocks[index];
+    const id = `${generation.current}-${index}`;
+    let alive = true;
+    let stopListening: (() => void) | undefined;
+    const controller = new AbortController();
+    if (b.kind === "팟캐스트") {
+      spoken.current = id;
+      setPodcastCueReady(false);
+      Speech.speak(
+        `${index + 1}번째 모듈, 팟캐스트 ${b.minutes}분을 시작해요.`,
+        {
+          language: "ko-KR",
+          onDone: () => {
+            if (alive) setPodcastCueReady(true);
+          },
+          onError: () => {
+            if (alive) setPodcastCueReady(true);
+          },
+        },
+      );
+    } else if (b.kind === "영어") {
+      spoken.current = id;
+      setStudyError("");
+      stopListening = playListening(studyConfig(b), (message) => {
+        if (alive) setStudyError(message);
+      });
+    } else if (b.kind === "뉴스") {
+      spoken.current = id;
+      loadNews(b.topic, controller.signal)
+        .then((feed) => {
+          if (alive)
+            Speech.speak(
+              `${index + 1}번째 모듈, 뉴스 ${b.minutes}분을 시작해요. ${briefing(feed, b.minutes)}`,
+              {
+                language: "ko-KR",
+                rate: 0.88,
+              },
+            );
+        })
+        .catch(() => {
+          if (alive)
+            Speech.speak(
+              "뉴스를 불러오지 못했어요. 네트워크를 확인하거나 다음 모듈로 이동해 주세요.",
+              { language: "ko-KR" },
+            );
+        });
+    } else if (spoken.current !== id) {
+      spoken.current = id;
+      Speech.speak(
+        `${index + 1}번째 모듈, ${b.kind}, ${b.minutes}분을 시작합니다. ${guide(b)}`,
+        {
+          language: "ko-KR",
+          rate: 0.88,
+        },
+      );
+    }
+    const update = () => {
+      const left = Math.max(
+        0,
+        Math.ceil((deadline.current - Date.now()) / 1000),
+      );
+      setRemaining(left);
+      if (!left) enter(index + 1, session);
+    };
+    const timer = setInterval(update, 500);
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") update();
+    });
+    return () => {
+      alive = false;
+      stopListening?.();
+      controller.abort();
+      clearInterval(timer);
+      subscription.remove();
+    };
+  }, [playing, paused, index, session]);
+
+  const beginRoutine = (routine: Routine) => {
+    if (!routine.blocks.length) return;
+    Speech.stop();
+    startedAt.current = Date.now();
+    pausedAt.current = 0;
+    pausedTime.current = 0;
+    skipped.current = false;
+    setSession(JSON.parse(JSON.stringify(routine)));
+    setDone(false);
+    setIndex(0);
+    setRemaining(routine.blocks[0].minutes * 60);
+    deadline.current = Date.now() + routine.blocks[0].minutes * 60000;
+    generation.current++;
+    spoken.current = "";
+    setPaused(false);
+    setPlaying(true);
+  };
+  const start = () => beginRoutine(active);
+  const pause = () => {
+    if (paused) {
+      if (pausedAt.current) pausedTime.current += Date.now() - pausedAt.current;
+      pausedAt.current = 0;
+      deadline.current = Date.now() + pausedRemaining.current * 1000;
+      setPaused(false);
+    } else {
+      pausedAt.current = Date.now();
+      pausedRemaining.current = remaining;
+      Speech.stop();
+      setPaused(true);
+    }
+  };
+  const edit = (only = false) => {
+    setDraft(JSON.parse(JSON.stringify(only ? active : base)));
+    setTodayOnly(only);
+  };
+  const createRoutine = () => {
+    const r = {
+      id: String(Date.now()),
+      name: "여유 있는 아침",
+      time: "08:00",
+      blocks: [
+        {
+          id: String(Date.now()),
+          kind: "명상" as Kind,
+          minutes: 5,
+          topic: options["명상"][0],
+        },
+      ],
+    };
+    setCallOpen(false);
+    setPodcastLibraryOpen(false);
+    setDraft(r);
+    setTodayOnly(false);
+  };
+  const selectMenu = (menu: MainMenu) => {
+    setPodcastLibraryOpen(false);
+    if (menu === "모닝콜") setCallOpen(true);
+    else {
+      setCallOpen(false);
+      setTab(menu);
+    }
+  };
+  const selectDialMode = (mode: DialMode) => {
+    setPreviewMode(mode);
+    setSettingsMode(mode);
+    const block =
+      active.blocks.find((b) => b.kind === mode && b.id === expandedBlock) ||
+      active.blocks.find((b) => b.kind === mode);
+    setExpandedBlock(mode === "뉴스" ? null : (block?.id ?? null));
+  };
+  const addMode = (kind: DialMode, minutes: number) => {
+    const block = {
+      ...(kind === "팟캐스트"
+        ? {
+            podcastId:
+              podcastSources.find((s) => s.id === "bbc-sixminute")?.id ||
+              podcastSources[0]?.id,
+          }
+        : {}),
+      id: `${Date.now()}-${Math.random()}`,
+      kind,
+      minutes,
+      topic: options[kind][0],
+    };
+    if (draft) setDraft({ ...draft, blocks: [...draft.blocks, block] });
+    else {
+      setDraft({ ...base, blocks: [...base.blocks, block] });
+      setTodayOnly(false);
+    }
+  };
+  const patch = (id: string, fn: (b: Block) => Block) =>
+    setDraft(
+      (d) =>
+        d && { ...d, blocks: d.blocks.map((b) => (b.id === id ? fn(b) : b)) },
+    );
+  const save = () => {
+    if (!draft) return;
+    const normalized = { ...draft, time: formatTime(draft.time) };
+    if (
+      !draft.name.trim() ||
+      !/^([01]\d|2[0-3]):[0-5]\d$/.test(normalized.time) ||
+      !draft.blocks.length
+    ) {
+      showAlert(
+        "설정을 확인해 주세요",
+        "이름, 루틴 시작 예정 시간, 하나 이상의 모듈이 필요해요.",
+      );
+      return;
+    }
+    if (todayOnly) setToday(normalized);
+    else {
+      setRoutines((v) =>
+        v.some((r) => r.id === draft.id)
+          ? v.map((r) => (r.id === draft.id ? normalized : r))
+          : [...v, normalized],
+      );
+      setSelected(draft.id);
+      setToday(null);
+    }
+    setDraft(null);
+  };
+  const button = (label: string, fn: () => void, secondary = false) => (
+    <Pressable
+      accessibilityRole="button"
+      onPress={fn}
+      style={[styles.button, secondary && styles.secondary]}
+    >
+      <Text style={[styles.buttonText, secondary && { color: "#245C56" }]}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+  const updateHomeBlock = (id: string, fn: (b: Block) => Block) => {
+    if (today?.id === base.id)
+      setToday({
+        ...today,
+        blocks: today.blocks.map((b) => (b.id === id ? fn(b) : b)),
+      });
+    else
+      setRoutines((v) =>
+        v.map((r) =>
+          r.id === base.id
+            ? { ...r, blocks: r.blocks.map((b) => (b.id === id ? fn(b) : b)) }
+            : r,
+        ),
+      );
+  };
+  const blockCard = (b: Block) => (
+    <View
+      key={b.id}
+      style={[styles.card, expandedBlock === b.id && styles.selectedCard]}
+    >
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${blockName(b)} 설정 ${expandedBlock === b.id ? "접기" : "펼치기"}`}
+        accessibilityState={{ expanded: expandedBlock === b.id }}
+        onPress={() => {
+          if (b.kind !== "낭독") setPreviewMode(b.kind);
+          setExpandedBlock((v) => (v === b.id ? null : b.id));
+        }}
+        style={styles.row}
+      >
+        <Text style={styles.icon}>{icons[b.kind]}</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.cardTitle}>{blockName(b)}</Text>
+          <Text style={styles.muted}>{blockTopic(b)}</Text>
+        </View>
+        <Text style={styles.cardTitle}>{b.minutes}분</Text>
+        <View
+          style={{
+            width: 44,
+            height: 44,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "#EDF3EF",
+            borderRadius: 12,
+          }}
+        >
+          <Text style={[styles.link, { fontSize: 20 }]}>
+            {expandedBlock === b.id ? "⌃" : "⌄"}
+          </Text>
+        </View>
+      </Pressable>
+      {expandedBlock === b.id && (
+        <SettingsReveal>
+          <View style={styles.row}>
+            <Text style={styles.label}>모듈 시간</Text>
+            <View style={styles.row}>
+              {button(
+                "−",
+                () =>
+                  updateHomeBlock(b.id, (x) => ({
+                    ...x,
+                    minutes: Math.max(1, x.minutes - 1),
+                  })),
+                true,
+              )}
+              <Text style={styles.cardTitle}>{b.minutes}분</Text>
+              {button(
+                "+",
+                () =>
+                  updateHomeBlock(b.id, (x) => ({
+                    ...x,
+                    minutes: Math.min(30, x.minutes + 1),
+                  })),
+                true,
+              )}
+            </View>
+          </View>
+          {b.kind === "팟캐스트" ? (
+            <PodcastSettings
+              sources={podcastSources}
+              selection={b}
+              minutes={b.minutes}
+              onSourcesChange={setPodcastSources}
+              onSelect={(value, topic) =>
+                updateHomeBlock(b.id, (x) => ({ ...x, ...value, topic }))
+              }
+            />
+          ) : b.kind === "영어" ? (
+            <LanguageSettings
+              config={studyConfig(b)}
+              onChange={(c) => updateHomeBlock(b.id, (x) => withStudy(x, c))}
+            />
+          ) : (
+            <View style={styles.chips}>
+              {options[b.kind].map((topic) => (
+                <Pressable
+                  key={topic}
+                  onPress={() =>
+                    updateHomeBlock(b.id, (x) => ({ ...x, topic }))
+                  }
+                  style={[
+                    styles.chip,
+                    b.topic === topic && styles.chipSelected,
+                  ]}
+                >
+                  <Text
+                    style={{ color: b.topic === topic ? "white" : "#245C56" }}
+                  >
+                    {topic}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+          <Text style={styles.notice}>
+            {today?.id === base.id
+              ? "오늘 루틴에 바로 반영돼요."
+              : "기본 루틴에 자동 저장돼요."}
+          </Text>
+        </SettingsReveal>
+      )}
+    </View>
+  );
+  if (!ready)
+    return (
+      <SafeAreaProvider>
+        <SafeAreaView style={styles.root}>
+          <Text style={styles.title}>모닝블록</Text>
+        </SafeAreaView>
+      </SafeAreaProvider>
+    );
+  return (
+    <SafeAreaProvider>
+      <SafeAreaView style={styles.root}>
+        <StatusBar style="dark" />
+        <AppHeader
+          minutes={sum(active.blocks)}
+          blocks={active.blocks.length}
+          editingDisabled={!!draft || playing}
+          onEdit={() => {
+            setPodcastLibraryOpen(false);
+            setCallOpen(false);
+            setDone(false);
+            edit(true);
+          }}
+        />
+        <ScrollView
+          ref={scrollRef}
+          scrollEnabled={!dialDragging && !moduleDragging}
+          scrollEventThrottle={16}
+          onScroll={(e) => {
+            scrollOffset.current = e.nativeEvent.contentOffset.y;
+          }}
+          onLayout={(e) => {
+            scrollHeight.current = e.nativeEvent.layout.height;
+            scrollMax.current = Math.max(
+              0,
+              contentHeight.current - scrollHeight.current,
+            );
+          }}
+          onContentSizeChange={(_w, h) => {
+            contentHeight.current = h;
+            scrollMax.current = Math.max(0, h - scrollHeight.current);
+          }}
+          contentContainerStyle={styles.content}
+        >
+          {podcastLibraryOpen ? (
+            <>
+              <Text style={styles.title}>내 팟캐스트 RSS</Text>
+              <PodcastSettings
+                sources={podcastSources}
+                selection={{}}
+                minutes={5}
+                onSelect={() => {}}
+                onSourcesChange={setPodcastSources}
+                libraryOnly
+              />
+              {podcastLibraryError && (
+                <Text style={styles.notice}>{podcastLibraryError}</Text>
+              )}
+              {button("내 루틴으로", () => setPodcastLibraryOpen(false), true)}
+            </>
+          ) : callOpen ? (
+            <MorningCallScreen
+              call={{
+                ...call,
+                routineId: routines.some((r) => r.id === call.routineId)
+                  ? call.routineId
+                  : base.id,
+              }}
+              routines={routines}
+              onSave={setCall}
+              onClose={() => setCallOpen(false)}
+            />
+          ) : draft ? (
+            <>
+              <Text style={styles.eyebrow}>
+                {todayOnly ? "오늘만 변경" : "루틴 편집"}
+              </Text>
+              <Text style={styles.title}>내 아침을 조립해요</Text>
+              <Text style={styles.label}>루틴 이름</Text>
+              <TextInput
+                accessibilityLabel="루틴 이름"
+                style={styles.input}
+                value={draft.name}
+                onChangeText={(name) => setDraft({ ...draft, name })}
+              />
+              <Text style={styles.label}>
+                루틴 시작 예정 시간 · 24시간 형식
+              </Text>
+              <TimeStepper
+                label="루틴 시작 예정 시간"
+                value={draft.time}
+                onChange={(time) => setDraft({ ...draft, time })}
+              />
+              <Text style={styles.notice}>
+                루틴 시작 예정 시간이에요. 모닝콜 시간과 반복 요일은 하단 모닝콜
+                메뉴에서 따로 정할 수 있어요.
+              </Text>
+              <ReorderableModules
+                items={draft.blocks}
+                onChange={(blocks) =>
+                  setDraft((d) => (d ? { ...d, blocks } : d))
+                }
+                onDragState={setModuleDragging}
+                scrollRef={scrollRef}
+                scrollOffset={scrollOffset}
+                onAutoScroll={autoScroll}
+                renderItem={(b, handle) => (
+                  <View style={styles.card}>
+                    <View style={styles.row}>
+                      {handle}
+                      <Text style={styles.icon}>{icons[b.kind]}</Text>
+                      <Text style={[styles.cardTitle, { flex: 1 }]}>
+                        {blockName(b)}
+                      </Text>
+                      <Pressable
+                        accessibilityLabel={`${b.kind} 삭제`}
+                        onPress={() =>
+                          setDraft({
+                            ...draft,
+                            blocks: draft.blocks.filter((x) => x.id !== b.id),
+                          })
+                        }
+                      >
+                        <Text style={styles.link}>삭제</Text>
+                      </Pressable>
+                    </View>
+                    <View style={styles.row}>
+                      {button(
+                        "−",
+                        () =>
+                          patch(b.id, (x) => ({
+                            ...x,
+                            minutes: Math.max(1, x.minutes - 1),
+                          })),
+                        true,
+                      )}
+                      <Text style={styles.cardTitle}>{b.minutes}분</Text>
+                      {button(
+                        "+",
+                        () =>
+                          patch(b.id, (x) => ({
+                            ...x,
+                            minutes: Math.min(30, x.minutes + 1),
+                          })),
+                        true,
+                      )}
+                    </View>
+                    {b.kind === "팟캐스트" ? (
+                      <PodcastSettings
+                        sources={podcastSources}
+                        selection={b}
+                        minutes={b.minutes}
+                        onSourcesChange={setPodcastSources}
+                        onSelect={(value, topic) =>
+                          patch(b.id, (x) => ({ ...x, ...value, topic }))
+                        }
+                      />
+                    ) : b.kind === "영어" ? (
+                      <LanguageSettings
+                        config={studyConfig(b)}
+                        onChange={(c) => patch(b.id, (x) => withStudy(x, c))}
+                      />
+                    ) : (
+                      <View style={styles.chips}>
+                        {options[b.kind].map((topic) => (
+                          <Pressable
+                            key={topic}
+                            onPress={() =>
+                              patch(b.id, (x) => ({ ...x, topic }))
+                            }
+                            style={[
+                              styles.chip,
+                              b.topic === topic && styles.chipSelected,
+                            ]}
+                          >
+                            <Text
+                              style={{
+                                color: b.topic === topic ? "white" : "#245C56",
+                              }}
+                            >
+                              {topic}
+                            </Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                )}
+              />
+
+              <Text style={styles.label}>모듈 추가</Text>
+              <View style={styles.chips}>
+                {(
+                  ["스트레칭", "뉴스", "영어", "명상", "팟캐스트"] as DialMode[]
+                ).map((kind) => (
+                  <Pressable
+                    key={kind}
+                    style={styles.chip}
+                    onPress={() => addMode(kind, 5)}
+                  >
+                    <Text style={styles.link}>
+                      + {kind === "영어" ? "외국어" : kind}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+              {button(
+                "+ 낭독 추가",
+                () =>
+                  setDraft({
+                    ...draft,
+                    blocks: [
+                      ...draft.blocks,
+                      {
+                        id: `${Date.now()}-${Math.random()}`,
+                        kind: "낭독",
+                        minutes: 3,
+                        topic: options["낭독"][0],
+                      },
+                    ],
+                  }),
+                true,
+              )}
+              <Text style={styles.total}>총 {sum(draft.blocks)}분</Text>
+              {button("루틴 저장", save)}
+              {button("취소", () => setDraft(null), true)}
+            </>
+          ) : playing && session ? (
+            <>
+              <Text style={styles.eyebrow}>{session.name}</Text>
+              <View style={styles.chips}>
+                {session.blocks.map((b, i) => (
+                  <View
+                    key={b.id}
+                    style={[styles.chip, i === index && styles.chipSelected]}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        color: i === index ? "white" : "#245C56",
+                      }}
+                    >
+                      {i + 1}. {blockName(b)} · {b.minutes}분
+                    </Text>
+                  </View>
+                ))}
+              </View>
+              <Text style={styles.muted}>
+                선택한 루틴을 설정한 순서대로 진행해요.
+              </Text>
+              <Text style={styles.title}>
+                {blockName(session.blocks[index])}
+              </Text>
+              <Text style={styles.muted}>
+                {blockTopic(session.blocks[index])} · {index + 1}/
+                {session.blocks.length}
+              </Text>
+              {paused || session.blocks[index].kind === "낭독" ? (
+                <Blocky compact mood={paused ? "sleep" : "awake"} />
+              ) : (
+                <BlockyActivity
+                  compact
+                  language={studyConfig(session.blocks[index]).language}
+                  mode={session.blocks[index].kind as DialMode}
+                />
+              )}
+              <View style={styles.timerCircle}>
+                <Text style={styles.timer}>
+                  {Math.floor(remaining / 60)}:
+                  {String(remaining % 60).padStart(2, "0")}
+                </Text>
+                <Text style={styles.muted}>
+                  {paused ? "잠시 쉬는 중" : "남은 시간"}
+                </Text>
+              </View>
+              <Text style={styles.description}>
+                휴대폰을 내려놓고{"\n"}내 아침에 집중해요.
+              </Text>
+              <Text style={styles.notice}>
+                뉴스는 공개 RSS 제목·소개문을 읽어드려요. 낭독이 끝나면 남은
+                시간은 준비 시간으로 사용할 수 있어요. 외국어는 선택한
+                언어·단계의 리스닝 레슨으로 진행해요.
+              </Text>
+              {session.blocks[index].kind === "영어" && (
+                <>
+                  <ListeningLesson
+                    key={`${session.blocks[index].id}-${session.blocks[index].language}-${session.blocks[index].level}`}
+                    config={studyConfig(session.blocks[index])}
+                  />
+                  {studyError && (
+                    <Text style={styles.notice}>{studyError}</Text>
+                  )}
+                </>
+              )}
+              {session.blocks[index].kind === "팟캐스트" && (
+                <PodcastSettings
+                  key={session.blocks[index].id}
+                  sources={podcastSources}
+                  selection={session.blocks[index]}
+                  minutes={session.blocks[index].minutes}
+                  onSelect={() => {}}
+                  onSourcesChange={setPodcastSources}
+                  autoPlay
+                  startAudio={podcastCueReady}
+                  paused={paused}
+                  onTogglePause={pause}
+                />
+              )}
+              {session.blocks[index].kind === "뉴스" && (
+                <NewsPanel
+                  category={session.blocks[index].topic}
+                  minutes={session.blocks[index].minutes}
+                  allowPlayback={false}
+                />
+              )}
+              {button(paused ? "이어서 진행" : "일시정지", pause)}
+              {button(
+                "다음 모듈",
+                () => {
+                  skipped.current = true;
+                  enter(index + 1, session);
+                },
+                true,
+              )}
+              {button(
+                "루틴 종료",
+                () =>
+                  showAlert(
+                    "루틴을 마칠까요?",
+                    "중단한 루틴은 완료 기록에 포함하지 않아요.",
+                    [
+                      { text: "계속하기", style: "cancel" },
+                      {
+                        text: "종료",
+                        onPress: () => {
+                          Speech.stop();
+                          setPlaying(false);
+                        },
+                      },
+                    ],
+                  ),
+                true,
+              )}
+            </>
+          ) : done ? (
+            <>
+              <Text style={styles.eyebrow}>오늘의 작은 시작</Text>
+              <Text style={styles.title}>좋은 아침을 만들었어요</Text>
+              <Blocky mood="complete" />
+              <View style={styles.hero}>
+                <Text style={styles.heroIcon}>☀</Text>
+                <Text style={styles.total}>
+                  {skipped.current
+                    ? "루틴을 마쳤어요"
+                    : `${session ? sum(session.blocks) : 0}분 함께했어요`}
+                </Text>
+                <Text style={styles.description}>
+                  이제 나만의 속도로{"\n"}하루를 시작하세요.
+                </Text>
+              </View>
+              {button("오늘 화면으로", () => setDone(false))}
+            </>
+          ) : tab === "오늘" ? (
+            <>
+              <ModuleDial
+                language={
+                  studyConfig(
+                    active.blocks.find(
+                      (b) => b.kind === "영어" && b.id === expandedBlock,
+                    ) ||
+                      active.blocks.find((b) => b.kind === "영어") ||
+                      {},
+                  ).language
+                }
+                greeting="Good morning!"
+                activeMode={previewMode}
+                onModeChange={(mode) => {
+                  setPreviewMode(mode);
+                  setSettingsMode(null);
+                  setExpandedBlock(null);
+                }}
+                onModeSelect={selectDialMode}
+                onDragState={setDialDragging}
+              />
+              <View style={styles.row}>
+                <Text style={styles.section}>
+                  {settingsMode
+                    ? `${settingsMode === "영어" ? "외국어" : settingsMode} 설정`
+                    : "다이얼에서 모드를 선택해 주세요"}
+                </Text>
+                <Pressable onPress={() => edit(true)}>
+                  <Text style={styles.link}>오늘만 수정 →</Text>
+                </Pressable>
+              </View>
+              {settingsMode &&
+                active.blocks
+                  .filter((b) => b.kind === settingsMode)
+                  .slice(0, 1)
+                  .map(blockCard)}
+              {settingsMode === "뉴스" &&
+                active.blocks
+                  .filter((b) => b.id === expandedBlock && b.kind === "뉴스")
+                  .map((b) => (
+                    <NewsPanel
+                      key={b.id}
+                      category={b.topic}
+                      minutes={b.minutes}
+                    />
+                  ))}
+              {settingsMode &&
+                !active.blocks.some((b) => b.kind === settingsMode) && (
+                  <View style={styles.card}>
+                    <Text style={styles.muted}>
+                      이 모드는 아직 루틴에 없어요.
+                    </Text>
+                    {button(
+                      `＋ ${settingsMode === "영어" ? "외국어" : settingsMode} 루틴 추가`,
+                      () => addMode(settingsMode, 5),
+                    )}
+                  </View>
+                )}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="실행할 루틴 변경"
+                style={{ paddingVertical: 12 }}
+                onPress={() => setTab("내 루틴")}
+              >
+                <Text style={styles.link}>
+                  선택한 루틴: {active.name} · {sum(active.blocks)}분 변경 →
+                </Text>
+              </Pressable>
+              {button("▶  내 아침 시작하기", start)}
+              <Text style={styles.notice}>
+                뉴스는 뉴시스 공개 RSS와 연결돼요. 외국어는 언어·단계별 기본
+                리스닝 레슨을 제공해요. 모닝콜은 휴대폰 앱에서 예약 알림으로
+                동작해요.
+              </Text>
+            </>
+          ) : tab === "내 루틴" ? (
+            <>
+              <Text style={styles.eyebrow}>원하는 만큼, 원하는 순서로</Text>
+              <Text style={styles.title}>내 아침 컬렉션</Text>
+              {routines.map((r) => (
+                <Pressable
+                  key={r.id}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: r.id === selected }}
+                  accessibilityLabel={`${r.name}, 메인에서 실행할 루틴으로 선택`}
+                  style={[
+                    styles.card,
+                    r.id === selected && styles.selectedCard,
+                  ]}
+                  onPress={() => {
+                    setSelected(r.id);
+                    setToday(null);
+                  }}
+                >
+                  <Text style={styles.cardTitle}>
+                    {r.id === selected ? "● " : "○ "}
+                    {r.name}
+                  </Text>
+                  <Text style={styles.muted}>
+                    {r.time} · {sum(r.blocks)}분 · {r.blocks.length}개 블록
+                  </Text>
+                  {r.id === selected && (
+                    <Text style={styles.link}>메인에서 시작할 루틴</Text>
+                  )}
+                </Pressable>
+              ))}
+              {button("선택한 루틴 편집", () => edit())}
+              <VoiceSettings />
+              {button(
+                "팟캐스트 RSS 추가·관리",
+                () => setPodcastLibraryOpen(true),
+                true,
+              )}
+              {button("+ 새 루틴 만들기", createRoutine, true)}
+              {routines.length > 1 &&
+                button(
+                  "선택한 루틴 삭제",
+                  () =>
+                    showAlert("루틴 삭제", "이 루틴을 삭제할까요?", [
+                      { text: "취소", style: "cancel" },
+                      {
+                        text: "삭제",
+                        style: "destructive",
+                        onPress: () => {
+                          if (call.enabled && call.routineId === selected) {
+                            showAlert(
+                              "모닝콜에 연결된 루틴",
+                              "먼저 모닝콜을 끄거나 다른 루틴으로 연결해 주세요.",
+                            );
+                            return;
+                          }
+                          setRoutines((v) =>
+                            v.filter((r) => r.id !== selected),
+                          );
+                          setSelected(
+                            routines.find((r) => r.id !== selected)!.id,
+                          );
+                          setToday(null);
+                        },
+                      },
+                    ]),
+                  true,
+                )}
+            </>
+          ) : (
+            <RecordsScreen records={records} />
+          )}
+        </ScrollView>
+        {!draft && !playing && !done && (
+          <BottomNavigation
+            active={callOpen ? "모닝콜" : tab}
+            onSelect={selectMenu}
+            onCreate={createRoutine}
+          />
+        )}
+      </SafeAreaView>
+    </SafeAreaProvider>
+  );
+}
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: "#F7F4EE",
+    width: "100%",
+    maxWidth: 480,
+    alignSelf: "center",
+  },
+  content: { padding: 24, paddingTop: 12, paddingBottom: 36, gap: 14 },
+  eyebrow: { color: "#245C56", fontSize: 13, fontWeight: "600" },
+  title: {
+    fontSize: 30,
+    lineHeight: 42,
+    fontWeight: "800",
+    color: "#252D2B",
+    marginBottom: 8,
+  },
+  hero: { backgroundColor: "#EEE9DF", borderRadius: 28, padding: 26, gap: 12 },
+  heroIcon: { fontSize: 45, color: "#B76735" },
+  total: { fontSize: 36, fontWeight: "800", color: "#245C56" },
+  muted: { fontSize: 13, lineHeight: 21, color: "#626C67" },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  section: { fontSize: 18, fontWeight: "700", color: "#252D2B" },
+  card: { backgroundColor: "#FFFFFF", padding: 20, borderRadius: 20, gap: 14 },
+  cardTitle: { fontSize: 17, fontWeight: "700", color: "#252D2B" },
+  icon: {
+    width: 44,
+    height: 44,
+    textAlign: "center",
+    textAlignVertical: "center",
+    lineHeight: 44,
+    backgroundColor: "#EDF3EF",
+    borderRadius: 14,
+    color: "#245C56",
+    fontSize: 22,
+    fontWeight: "600",
+  },
+  link: { color: "#245C56", fontSize: 14, fontWeight: "600" },
+  button: {
+    minHeight: 52,
+    paddingHorizontal: 22,
+    paddingVertical: 16,
+    backgroundColor: "#245C56",
+    borderRadius: 16,
+    alignItems: "center",
+  },
+  buttonText: { color: "white", fontWeight: "700", fontSize: 16 },
+  secondary: { backgroundColor: "#E8EEE9" },
+  notice: { fontSize: 12, color: "#626C67", lineHeight: 19 },
+  label: { fontSize: 14, color: "#252D2B", fontWeight: "600" },
+  input: {
+    backgroundColor: "white",
+    borderRadius: 14,
+    padding: 16,
+    fontSize: 16,
+    color: "#252D2B",
+  },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  chip: {
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: "#E8EEE9",
+    minHeight: 44,
+  },
+  chipSelected: { backgroundColor: "#245C56" },
+  selectedCard: { borderWidth: 2, borderColor: "#245C56" },
+  timerCircle: {
+    alignSelf: "center",
+    width: 250,
+    height: 250,
+    borderRadius: 125,
+    backgroundColor: "#EEE9DF",
+    alignItems: "center",
+    justifyContent: "center",
+    marginVertical: 26,
+    gap: 12,
+  },
+  timer: { fontSize: 56, fontWeight: "700", color: "#245C56" },
+  description: {
+    textAlign: "center",
+    fontSize: 18,
+    lineHeight: 29,
+    color: "#252D2B",
+  },
+});

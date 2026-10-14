@@ -1,8 +1,171 @@
-import React,{useEffect,useRef} from 'react';
-import {AccessibilityInfo,Animated,Platform,Pressable,StyleSheet,Text,View} from 'react-native';
-export default function AppHeader({minutes,blocks,onEdit,editingDisabled=false}:{minutes:number;blocks:number;onEdit:()=>void;editingDisabled?:boolean}){
- const pieces=useRef([0,1,2,3].map(()=>new Animated.Value(1))).current;
- useEffect(()=>{let alive=true;let animation:Animated.CompositeAnimation|null=null;const settle=()=>{animation?.stop();pieces.forEach(p=>p.setValue(1))};AccessibilityInfo.isReduceMotionEnabled().then(reduced=>{if(!alive||reduced)return;pieces.forEach(p=>p.setValue(0));animation=Animated.stagger(90,pieces.map(p=>Animated.spring(p,{toValue:1,damping:16,stiffness:150,mass:0.6,useNativeDriver:Platform.OS!=='web'})));animation.start()});const subscription=AccessibilityInfo.addEventListener('reduceMotionChanged',reduced=>{if(reduced)settle()});return()=>{alive=false;settle();subscription.remove()};},[]);
- return <View style={s.header}><View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={s.mark}>{pieces.map((piece,i)=><Animated.View key={i} style={[s.block,{left:(i%2)*14+2,top:Math.floor(i/2)*14+2,backgroundColor:['#245C56','#A8CBBB','#F2BE99','#77B2A7'][i],opacity:piece,transform:[{translateX:piece.interpolate({inputRange:[0,1],outputRange:[i%2?10:-10,0]})},{translateY:piece.interpolate({inputRange:[0,1],outputRange:[i<2?-10:10,0]})},{scale:piece.interpolate({inputRange:[0,1],outputRange:[0.65,1]})}]}]} />)}</View><View style={s.copy}><Text style={s.brand}>모닝블록</Text><Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={s.title}>오늘도, 좋은 아침을 조립해요</Text></View><Pressable accessibilityRole="button" accessibilityLabel={`오늘의 루틴 ${minutes}분, 블록 ${blocks}개. 루틴 편집`} disabled={editingDisabled} onPress={onEdit} style={({pressed})=>[s.routine,pressed&&s.pressed]}><View style={s.chip}><Text style={s.chipText}>{minutes}분 루틴</Text></View><View style={[s.chip,s.blockChip]}><Text style={s.chipText}>{blocks}개 블록</Text></View></Pressable></View>
+import { useEffect, useRef } from "react";
+import {
+  AccessibilityInfo,
+  Animated,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+export default function AppHeader({
+  minutes,
+  blocks,
+  onEdit,
+  editingDisabled = false,
+}: {
+  minutes: number;
+  blocks: number;
+  onEdit: () => void;
+  editingDisabled?: boolean;
+}) {
+  const pieces = useRef([0, 1, 2, 3].map(() => new Animated.Value(1))).current;
+  useEffect(() => {
+    let alive = true;
+    let animation: Animated.CompositeAnimation | null = null;
+    const settle = () => {
+      animation?.stop();
+      pieces.forEach((p) => p.setValue(1));
+    };
+    AccessibilityInfo.isReduceMotionEnabled().then((reduced) => {
+      if (!alive || reduced) return;
+      pieces.forEach((p) => p.setValue(0));
+      animation = Animated.stagger(
+        90,
+        pieces.map((p) =>
+          Animated.spring(p, {
+            toValue: 1,
+            damping: 16,
+            stiffness: 150,
+            mass: 0.6,
+            useNativeDriver: Platform.OS !== "web",
+          }),
+        ),
+      );
+      animation.start();
+    });
+    const subscription = AccessibilityInfo.addEventListener(
+      "reduceMotionChanged",
+      (reduced) => {
+        if (reduced) settle();
+      },
+    );
+    return () => {
+      alive = false;
+      settle();
+      subscription.remove();
+    };
+  }, []);
+  return (
+    <View style={s.header}>
+      <View
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        style={s.mark}
+      >
+        {pieces.map((piece, i) => (
+          <Animated.View
+            key={i}
+            style={[
+              s.block,
+              {
+                left: (i % 2) * 14 + 2,
+                top: Math.floor(i / 2) * 14 + 2,
+                backgroundColor: ["#245C56", "#A8CBBB", "#F2BE99", "#77B2A7"][
+                  i
+                ],
+                opacity: piece,
+                transform: [
+                  {
+                    translateX: piece.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [i % 2 ? 10 : -10, 0],
+                    }),
+                  },
+                  {
+                    translateY: piece.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [i < 2 ? -10 : 10, 0],
+                    }),
+                  },
+                  {
+                    scale: piece.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.65, 1],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          />
+        ))}
+      </View>
+      <View style={s.copy}>
+        <Text style={s.brand}>모닝블록</Text>
+        <Text
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.8}
+          style={s.title}
+        >
+          오늘도, 좋은 아침을 조립해요
+        </Text>
+      </View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`오늘의 루틴 ${minutes}분, 블록 ${blocks}개. 루틴 편집`}
+        disabled={editingDisabled}
+        onPress={onEdit}
+        style={({ pressed }) => [s.routine, pressed && s.pressed]}
+      >
+        <View style={s.chip}>
+          <Text style={s.chipText}>{minutes}분 루틴</Text>
+        </View>
+        <View style={[s.chip, s.blockChip]}>
+          <Text style={s.chipText}>{blocks}개 블록</Text>
+        </View>
+      </Pressable>
+    </View>
+  );
 }
-const s=StyleSheet.create({header:{height:56,minHeight:56,maxHeight:56,flexDirection:'row',alignItems:'center',paddingHorizontal:24,gap:8,overflow:'hidden'},mark:{width:32,height:32,flexShrink:0,overflow:'hidden'},block:{position:'absolute',width:12,height:12,borderRadius:4},copy:{flex:1,minWidth:0,gap:2},brand:{fontSize:15,lineHeight:18,fontWeight:'800',color:'#245C56'},title:{fontSize:10,lineHeight:14,color:'#626C67',fontWeight:'500'},routine:{minWidth:66,height:44,justifyContent:'center',alignItems:'stretch',gap:3,paddingHorizontal:2,borderRadius:10},chip:{paddingVertical:2,paddingHorizontal:7,borderRadius:8,backgroundColor:'#E6EEE6',alignItems:'center'},blockChip:{backgroundColor:'#F3E8DA'},chipText:{fontSize:9,lineHeight:12,fontWeight:'700',color:'#245C56'},pressed:{opacity:0.7}});
+const s = StyleSheet.create({
+  header: {
+    height: 56,
+    minHeight: 56,
+    maxHeight: 56,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 24,
+    gap: 8,
+    overflow: "hidden",
+  },
+  mark: { width: 32, height: 32, flexShrink: 0, overflow: "hidden" },
+  block: { position: "absolute", width: 12, height: 12, borderRadius: 4 },
+  copy: { flex: 1, minWidth: 0, gap: 2 },
+  brand: { fontSize: 15, lineHeight: 18, fontWeight: "800", color: "#245C56" },
+  title: { fontSize: 10, lineHeight: 14, color: "#626C67", fontWeight: "500" },
+  routine: {
+    minWidth: 66,
+    height: 44,
+    justifyContent: "center",
+    alignItems: "stretch",
+    gap: 3,
+    paddingHorizontal: 2,
+    borderRadius: 10,
+  },
+  chip: {
+    paddingVertical: 2,
+    paddingHorizontal: 7,
+    borderRadius: 8,
+    backgroundColor: "#E6EEE6",
+    alignItems: "center",
+  },
+  blockChip: { backgroundColor: "#F3E8DA" },
+  chipText: {
+    fontSize: 9,
+    lineHeight: 12,
+    fontWeight: "700",
+    color: "#245C56",
+  },
+  pressed: { opacity: 0.7 },
+});

@@ -12,9 +12,7 @@
     },
     "android": {
       "package": "com.morningblock.app",
-      "permissions": [
-        "android.permission.SCHEDULE_EXACT_ALARM"
-      ]
+      "permissions": ["android.permission.SCHEDULE_EXACT_ALARM"]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -25,7 +23,15 @@
       "backgroundColor": "#F7F4EE"
     },
     "plugins": [
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-audio",
+        {
+          "enableBackgroundPlayback": true,
+          "recordAudioAndroid": false,
+          "microphonePermission": false
+        }
+      ]
     ]
   }
 }

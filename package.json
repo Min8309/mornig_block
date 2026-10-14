@@ -8,7 +8,9 @@
     "@expo/metro-runtime": "~57.0.16",
     "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "~57.0.28",
+    "expo-audio": "~57.0.5",
     "expo-notifications": "~57.0.22",
+    "expo-secure-store": "~57.0.4",
     "expo-speech": "~57.0.3",
     "expo-status-bar": "~57.0.1",
     "fast-xml-parser": "^5.11.2",
@@ -29,7 +31,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "test": "node tests/morning-call.test.cjs"
+    "test": "node --test tests/*.test.cjs"
   },
   "private": true
 }

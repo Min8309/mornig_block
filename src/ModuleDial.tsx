@@ -1,40 +1,706 @@
-import React,{useEffect,useRef,useState} from 'react';
-import {AccessibilityInfo,Animated,Image,PanResponder,Platform,Pressable,StyleSheet,Text,View} from 'react-native';
-import Svg,{Circle,Line,Path} from 'react-native-svg';
-import {StudyLanguage} from './language-lessons';
-import {angleForIndex,DialMode,dialModes,modeIndex,shortestDelta,snapAngle} from './dial-model';
-const modeName=(mode:DialMode)=>mode==='영어'?'외국어':mode;
-const themes:Record<DialMode,{bg:string;accent:string;label:string;description:string;symbol:string}>={
- '스트레칭':{bg:'#E6EEE1',accent:'#42704C',label:'MOVE YOUR MORNING',description:'몸을 가볍게 풀고, 하루의 속도를 찾아요.',symbol:'↗'},
- '뉴스':{bg:'#F1E8D8',accent:'#876744',label:'A LITTLE WORLD UPDATE',description:'차분한 소식으로 세상과 연결돼요.',symbol:'≋'},
- '영어':{bg:'#E8E7F3',accent:'#686096',label:'ONE WORD AT A TIME',description:'한마디씩 듣고 말하며 아침을 열어요.',symbol:'Aa'},
- '명상':{bg:'#E3EFED',accent:'#3F7470',label:'BREATHE INTO YOUR DAY',description:'잠깐의 호흡으로 나에게 돌아와요.',symbol:'◎'}};
-export function BlockyActivity({mode,compact=false,language='en'}:{mode:DialMode;compact?:boolean;language?:StudyLanguage}){
- const [reduced,setReduced]=useState(true),[runFrame,setRunFrame]=useState(0),[englishFailed,setEnglishFailed]=useState(false);const motion=useRef(new Animated.Value(0)).current;
- useEffect(()=>{let active=true;AccessibilityInfo.isReduceMotionEnabled().then(v=>{if(active)setReduced(v)});const sub=AccessibilityInfo.addEventListener('reduceMotionChanged',setReduced);return()=>{active=false;sub.remove()};},[]);
- useEffect(()=>{motion.setValue(0);setRunFrame(0);if(reduced)return;const speed=mode==='스트레칭'?210:mode==='명상'?2800:1700;const loop=Animated.loop(Animated.sequence([Animated.timing(motion,{toValue:1,duration:speed,useNativeDriver:Platform.OS!=='web'}),Animated.timing(motion,{toValue:0,duration:speed,useNativeDriver:Platform.OS!=='web'})]));loop.start();const timer=mode==='스트레칭'?setInterval(()=>setRunFrame(v=>1-v),210):null;return()=>{loop.stop();if(timer)clearInterval(timer)};},[mode,reduced]);
- const size=compact?164:226;const frame=mode==='스트레칭'?runFrame:mode==='뉴스'?2:3;const x=frame%2,y=Math.floor(frame/2);
- return <View style={[s.characterStage,{height:compact?176:244}]} accessibilityLabel={`블로키 ${mode} 모드`}>
- {mode==='영어'&&({en:['Hello','Morning','Today','A','B'],ja:['おはよう','朝','今日','あ','い'],zh:['你好','早上好','今天','学','习'],es:['Hola','Buenos días','Hoy','A','B']}[language]).map((word,i)=><Animated.Text key={word} style={[s.word,{color:themes[mode].accent,left:`${[2,61,7,82,43][i]}%`,top:[18,60,154,144,2][i],fontSize:i<3?13:22,opacity:motion.interpolate({inputRange:[0,1],outputRange:[0.35,0.85]}),transform:[{translateY:motion.interpolate({inputRange:[0,1],outputRange:[i%2?6:0,i%2?-10:-15]})},{rotate:i%2?'12deg':'-12deg'}]}]}>{word}</Animated.Text>)}
- {mode==='명상'&&<Animated.View style={[s.breathe,{borderColor:themes[mode].accent,transform:[{scale:motion.interpolate({inputRange:[0,1],outputRange:[0.86,1.08]})}],opacity:motion.interpolate({inputRange:[0,1],outputRange:[0.15,0.35]})}]}/>}
- <Animated.View key={mode} style={{width:size,height:size,flexShrink:0,zIndex:1,transform:[{translateY:motion.interpolate({inputRange:[0,1],outputRange:[0,mode==='스트레칭'?-10:mode==='명상'?-3:-4]})},{rotate:motion.interpolate({inputRange:[0,1],outputRange:mode==='뉴스'?['-2deg','2deg']:['0deg','0deg']})},{scale:motion.interpolate({inputRange:[0,1],outputRange:[1,mode==='명상'?1.025:1]})}]}}>
- <View style={{width:size,height:size,overflow:'hidden'}}>{mode==='영어'&&englishFailed?<Image key="blocky-english-fallback" source={require('../assets/blocky-strip.png')} resizeMode="stretch" style={{position:'absolute',width:size*5,height:size*5/3,left:-3*size,top:-size/3}}/>:mode==='영어'?<Image onError={()=>setEnglishFailed(true)} key="blocky-english" source={require('../assets/blocky-english.png')} resizeMode="contain" style={{position:'absolute',left:0,top:0,width:size,height:size,flexShrink:0}}/>:<Image key="blocky-atlas" source={require('../assets/blocky-modes.png')} resizeMode="stretch" style={{position:'absolute',width:size*4,height:size*2,left:-(x===0?0.64:2.32)*size,top:-y*size}}/>}</View>
- </Animated.View><View style={[s.shadow,{width:compact?88:116,backgroundColor:themes[mode].accent}]}/></View>
+import { useEffect, useRef, useState } from "react";
+import {
+  AccessibilityInfo,
+  Animated,
+  Image,
+  PanResponder,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import Svg, { Circle, Line } from "react-native-svg";
+import { StudyLanguage } from "./language-lessons";
+import {
+  angleForIndex,
+  DialMode,
+  dialModes,
+  modeIndex,
+  shortestDelta,
+  snapAngle,
+} from "./dial-model";
+const modeName = (mode: DialMode) => (mode === "영어" ? "외국어" : mode);
+const themes: Record<
+  DialMode,
+  {
+    bg: string;
+    accent: string;
+    label: string;
+    description: string;
+    symbol: string;
+  }
+> = {
+  스트레칭: {
+    bg: "#E6EEE1",
+    accent: "#42704C",
+    label: "MOVE YOUR MORNING",
+    description: "몸을 가볍게 풀고, 하루의 속도를 찾아요.",
+    symbol: "↗",
+  },
+  뉴스: {
+    bg: "#F1E8D8",
+    accent: "#876744",
+    label: "A LITTLE WORLD UPDATE",
+    description: "차분한 소식으로 세상과 연결돼요.",
+    symbol: "≋",
+  },
+  영어: {
+    bg: "#E8E7F3",
+    accent: "#686096",
+    label: "ONE WORD AT A TIME",
+    description: "한마디씩 듣고 말하며 아침을 열어요.",
+    symbol: "Aa",
+  },
+  팟캐스트: {
+    bg: "#E8E7F3",
+    accent: "#686096",
+    label: "YOUR FAVORITE VOICES",
+    description: "좋아하는 목소리와 함께 아침을 시작해요.",
+    symbol: "♫",
+  },
+  명상: {
+    bg: "#E3EFED",
+    accent: "#3F7470",
+    label: "BREATHE INTO YOUR DAY",
+    description: "잠깐의 호흡으로 나에게 돌아와요.",
+    symbol: "◎",
+  },
+};
+export function BlockyActivity({
+  mode,
+  compact = false,
+  language = "en",
+}: {
+  mode: DialMode;
+  compact?: boolean;
+  language?: StudyLanguage;
+}) {
+  const [reduced, setReduced] = useState(true),
+    [runFrame, setRunFrame] = useState(0),
+    [englishFailed, setEnglishFailed] = useState(false);
+  const motion = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    let active = true;
+    AccessibilityInfo.isReduceMotionEnabled().then((v) => {
+      if (active) setReduced(v);
+    });
+    const sub = AccessibilityInfo.addEventListener(
+      "reduceMotionChanged",
+      setReduced,
+    );
+    return () => {
+      active = false;
+      sub.remove();
+    };
+  }, []);
+  useEffect(() => {
+    motion.setValue(0);
+    setRunFrame(0);
+    if (reduced) return;
+    const speed = mode === "스트레칭" ? 210 : mode === "명상" ? 2800 : 1700;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(motion, {
+          toValue: 1,
+          duration: speed,
+          useNativeDriver: Platform.OS !== "web",
+        }),
+        Animated.timing(motion, {
+          toValue: 0,
+          duration: speed,
+          useNativeDriver: Platform.OS !== "web",
+        }),
+      ]),
+    );
+    loop.start();
+    const timer =
+      mode === "스트레칭"
+        ? setInterval(() => setRunFrame((v) => 1 - v), 210)
+        : null;
+    return () => {
+      loop.stop();
+      if (timer) clearInterval(timer);
+    };
+  }, [mode, reduced]);
+  const size = compact ? 164 : 226;
+  const frame = mode === "스트레칭" ? runFrame : mode === "뉴스" ? 2 : 3;
+  const x = frame % 2,
+    y = Math.floor(frame / 2);
+  return (
+    <View
+      style={[s.characterStage, { height: compact ? 176 : 244 }]}
+      accessibilityLabel={`블로키 ${mode} 모드`}
+    >
+      {mode === "영어" &&
+        {
+          en: ["Hello", "Morning", "Today", "A", "B"],
+          ja: ["おはよう", "朝", "今日", "あ", "い"],
+          zh: ["你好", "早上好", "今天", "学", "习"],
+          es: ["Hola", "Buenos días", "Hoy", "A", "B"],
+        }[language].map((word, i) => (
+          <Animated.Text
+            key={word}
+            style={[
+              s.word,
+              {
+                color: themes[mode].accent,
+                left: `${[2, 61, 7, 82, 43][i]}%`,
+                top: [18, 60, 154, 144, 2][i],
+                fontSize: i < 3 ? 13 : 22,
+                opacity: motion.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.35, 0.85],
+                }),
+                transform: [
+                  {
+                    translateY: motion.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [i % 2 ? 6 : 0, i % 2 ? -10 : -15],
+                    }),
+                  },
+                  { rotate: i % 2 ? "12deg" : "-12deg" },
+                ],
+              },
+            ]}
+          >
+            {word}
+          </Animated.Text>
+        ))}
+      {mode === "명상" && (
+        <Animated.View
+          style={[
+            s.breathe,
+            {
+              borderColor: themes[mode].accent,
+              transform: [
+                {
+                  scale: motion.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.86, 1.08],
+                  }),
+                },
+              ],
+              opacity: motion.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.15, 0.35],
+              }),
+            },
+          ]}
+        />
+      )}
+      <Animated.View
+        key={mode}
+        style={{
+          width: size,
+          height: size,
+          flexShrink: 0,
+          zIndex: 1,
+          transform: [
+            {
+              translateY: motion.interpolate({
+                inputRange: [0, 1],
+                outputRange: [
+                  0,
+                  mode === "스트레칭" ? -10 : mode === "명상" ? -3 : -4,
+                ],
+              }),
+            },
+            {
+              rotate: motion.interpolate({
+                inputRange: [0, 1],
+                outputRange:
+                  mode === "뉴스" || mode === "팟캐스트"
+                    ? ["-2deg", "2deg"]
+                    : ["0deg", "0deg"],
+              }),
+            },
+            {
+              scale: motion.interpolate({
+                inputRange: [0, 1],
+                outputRange: [1, mode === "명상" ? 1.025 : 1],
+              }),
+            },
+          ],
+        }}
+      >
+        <View style={{ width: size, height: size, overflow: "hidden" }}>
+          {mode === "팟캐스트" ? (
+            <Image
+              source={require("../assets/blocky-podcast.png")}
+              resizeMode="contain"
+              style={{ width: size, height: size }}
+            />
+          ) : mode === "영어" && englishFailed ? (
+            <Image
+              key="blocky-english-fallback"
+              source={require("../assets/blocky-strip.png")}
+              resizeMode="stretch"
+              style={{
+                position: "absolute",
+                width: size * 5,
+                height: (size * 5) / 3,
+                left: -3 * size,
+                top: -size / 3,
+              }}
+            />
+          ) : mode === "영어" ? (
+            <Image
+              onError={() => setEnglishFailed(true)}
+              key="blocky-english"
+              source={require("../assets/blocky-english.png")}
+              resizeMode="contain"
+              style={{
+                position: "absolute",
+                left: 0,
+                top: 0,
+                width: size,
+                height: size,
+                flexShrink: 0,
+              }}
+            />
+          ) : (
+            <Image
+              key="blocky-atlas"
+              source={require("../assets/blocky-modes.png")}
+              resizeMode="stretch"
+              style={{
+                position: "absolute",
+                width: size * 4,
+                height: size * 2,
+                left: -(x === 0 ? 0.64 : 2.32) * size,
+                top: -y * size,
+              }}
+            />
+          )}
+        </View>
+      </Animated.View>
+      <View
+        style={[
+          s.shadow,
+          { width: compact ? 88 : 116, backgroundColor: themes[mode].accent },
+        ]}
+      />
+    </View>
+  );
 }
-export default function ModuleDial({onAdd,onDragState,previewOnly=false,activeMode,onModeChange,onModeSelect,showBuilder=true,footer,greeting,language='en'}:{previewOnly?:boolean;activeMode?:DialMode;onModeChange?:(mode:DialMode)=>void;onModeSelect?:(mode:DialMode)=>void;showBuilder?:boolean;footer?:React.ReactNode;greeting?:string;language?:StudyLanguage;onAdd:(mode:DialMode,minutes:number)=>void;onDragState?:(dragging:boolean)=>void}){
- const callbacks=useRef({onModeChange,onModeSelect});callbacks.current={onModeChange,onModeSelect};
- const [index,setIndex]=useState(0),[minutes,setMinutes]=useState(5),[width,setWidth]=useState(310);const rotation=useRef(new Animated.Value(0)).current,transition=useRef(new Animated.Value(1)).current;const raw=useRef(0),lastPointer=useRef(0),center=useRef({x:0,y:0}),wheel=useRef<View>(null),timer=useRef<ReturnType<typeof setTimeout>|null>(null),selected=useRef(0),pointerReady=useRef(false);const size=Math.min(280,width-4),mode=dialModes[index],theme=themes[mode];
- useEffect(()=>{if(activeMode){const next=dialModes.indexOf(activeMode);if(selected.current!==next){const value=angleForIndex(raw.current,next);raw.current=value;rotation.setValue(value);selected.current=next;setIndex(next);}}},[activeMode]);
- const update=(angle:number)=>{raw.current=angle;rotation.setValue(angle);const next=modeIndex(angle);if(next!==selected.current){selected.current=next;setIndex(next);callbacks.current.onModeChange?.(dialModes[next])}};
- const snap=()=>{const value=snapAngle(raw.current);raw.current=value;Animated.spring(rotation,{toValue:value,useNativeDriver:Platform.OS!=='web',damping:18,stiffness:150,mass:0.7}).start();onDragState?.(false);callbacks.current.onModeSelect?.(dialModes[modeIndex(value)])};
- const choose=(next:number)=>{const value=angleForIndex(raw.current,(next+4)%4);raw.current=value;selected.current=modeIndex(value);setIndex(selected.current);callbacks.current.onModeChange?.(dialModes[selected.current]);callbacks.current.onModeSelect?.(dialModes[selected.current]);Animated.spring(rotation,{toValue:value,useNativeDriver:Platform.OS!=='web',damping:18,stiffness:150,mass:0.7}).start()};
- useEffect(()=>{transition.setValue(0.85);Animated.timing(transition,{toValue:1,duration:240,useNativeDriver:Platform.OS!=='web'}).start();},[index]);
- useEffect(()=>()=>{if(timer.current)clearTimeout(timer.current);onDragState?.(false)},[]);
- const responder=useRef(PanResponder.create({onStartShouldSetPanResponder:()=>true,onMoveShouldSetPanResponder:()=>true,onPanResponderGrant:e=>{pointerReady.current=false;const point={x:e.nativeEvent.pageX,y:e.nativeEvent.pageY};rotation.stopAnimation(v=>{raw.current=v});onDragState?.(true);wheel.current?.measureInWindow((x,y,w,h)=>{center.current={x:x+w/2,y:y+h/2};lastPointer.current=Math.atan2(point.y-center.current.y,point.x-center.current.x)*180/Math.PI;pointerReady.current=true;});},onPanResponderMove:e=>{if(!pointerReady.current)return;const a=Math.atan2(e.nativeEvent.pageY-center.current.y,e.nativeEvent.pageX-center.current.x)*180/Math.PI;update(raw.current+shortestDelta(lastPointer.current,a));lastPointer.current=a;},onPanResponderRelease:snap,onPanResponderTerminate:snap})).current;
- const rotate=rotation.interpolate({inputRange:[-36000,36000],outputRange:['-36000deg','36000deg']});
- return <View onLayout={e=>setWidth(e.nativeEvent.layout.width)} style={s.root}><View style={[s.scene,{backgroundColor:theme.bg}]}><View style={s.heading}><Text style={[s.eyebrow,{color:theme.accent}]}>{theme.label}</Text><Text style={s.step}>0{index+1} / 04</Text></View><Animated.View style={{opacity:transition,transform:[{scale:transition}]}}><BlockyActivity mode={mode} language={language}/>{greeting&&<View pointerEvents="none" accessibilityLabel={`블로키의 인사: ${greeting}`} style={s.greeting}><Text style={s.greetingText}>{greeting}</Text><View style={s.bubbleTail}/></View>}</Animated.View><Text style={[s.mode,{color:theme.accent}]}>{modeName(mode)}</Text><Text style={s.description}>{theme.description}</Text>
- {!previewOnly&&<>{footer&&<View style={s.integratedSummary}>{footer}</View>}<Text style={s.help}>반원 다이얼을 돌려 모드를 바꿔보세요</Text><View style={[s.halfDial,{width:size,height:size/2+8}]}><View style={[s.pointer,{left:size/2-4,backgroundColor:theme.accent}]}/><View ref={wheel} {...responder.panHandlers} accessibilityRole="adjustable" accessibilityLabel={`반원 모듈 다이얼, 현재 ${mode}`} accessibilityActions={[{name:'increment',label:'다음 모듈'},{name:'decrement',label:'이전 모듈'}]} onAccessibilityAction={e=>choose(index+(e.nativeEvent.actionName==='increment'?1:-1))} style={{width:size,height:size,marginTop:8,touchAction:'none'} as any} {...(Platform.OS==='web'?{onWheel:(e:any)=>{e.preventDefault?.();update(raw.current-(e.nativeEvent?.deltaY??e.deltaY??0)*0.35);if(timer.current)clearTimeout(timer.current);timer.current=setTimeout(snap,180)}}:{})}><Animated.View style={{width:size,height:size,transform:[{rotate}]}}><Svg width={size} height={size} viewBox="0 0 280 280"><Circle cx="140" cy="140" r="132" fill="#FFFFFF" fillOpacity={0.85} stroke="#FFFFFF" strokeWidth="1"/><Circle cx="140" cy="140" r="73" fill={theme.bg} stroke="#D4DDD3" strokeWidth="1"/>{Array.from({length:48},(_,i)=>{const a=i*Math.PI/24;return <Line key={i} x1={140+Math.sin(a)*119} y1={140-Math.cos(a)*119} x2={140+Math.sin(a)*(i%12===0?108:114)} y2={140-Math.cos(a)*(i%12===0?108:114)} stroke={i%12===0?theme.accent:'#C8D2C6'} strokeWidth={i%12===0?2.5:1}/>})}</Svg></Animated.View></View><Pressable accessibilityRole="button" accessibilityLabel={`${modeName(mode)} 설정 열기`} onPress={()=>callbacks.current.onModeSelect?.(mode)} style={[s.topMode,{left:size/2-30,top:34}]}><Text style={[s.symbol,{color:theme.accent}]}>{theme.symbol}</Text><Text style={[s.label,{color:theme.accent}]}>{modeName(mode)}</Text></Pressable><Pressable accessibilityLabel={`이전 모드 ${dialModes[(index+3)%4]}`} onPress={()=>choose(index-1)} style={[s.neighbor,{left:12,top:size*0.30}]}><Text style={s.neighborIcon}>{themes[dialModes[(index+3)%4]].symbol}</Text></Pressable><Pressable accessibilityLabel={`다음 모드 ${dialModes[(index+1)%4]}`} onPress={()=>choose(index+1)} style={[s.neighbor,{right:12,top:size*0.30}]}><Text style={s.neighborIcon}>{themes[dialModes[(index+1)%4]].symbol}</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel={`${modeName(mode)} 시간과 취향 설정`} onPress={()=>callbacks.current.onModeSelect?.(mode)} style={[s.turnHint,{left:size/2-45,top:size*0.38}]}><Text style={s.turnHintText}>설정 열기</Text></Pressable></View></>}
- </View>{showBuilder&&!previewOnly&&<><View style={s.duration}><Text style={s.durationLabel}>이 블록에 쓸 시간</Text><View style={s.timeRow}><Pressable accessibilityLabel="시간 1분 줄이기" onPress={()=>setMinutes(v=>Math.max(1,v-1))} style={s.timeButton}><Text style={s.timeButtonText}>−</Text></Pressable><Text style={s.minutes}>{minutes}<Text style={{fontSize:14}}> 분</Text></Text><Pressable accessibilityLabel="시간 1분 늘리기" onPress={()=>setMinutes(v=>Math.min(30,v+1))} style={s.timeButton}><Text style={s.timeButtonText}>+</Text></Pressable></View></View><Pressable accessibilityRole="button" style={[s.add,{backgroundColor:theme.accent}]} onPress={()=>onAdd(mode,minutes)}><Text style={s.addText}>＋ {mode} {minutes}분 루틴에 담기</Text></Pressable></>}</View>
-
+export default function ModuleDial({
+  onDragState,
+  activeMode,
+  onModeChange,
+  onModeSelect,
+  greeting,
+  language = "en",
+}: {
+  activeMode?: DialMode;
+  onModeChange?: (mode: DialMode) => void;
+  onModeSelect?: (mode: DialMode) => void;
+  greeting?: string;
+  language?: StudyLanguage;
+  onDragState?: (dragging: boolean) => void;
+}) {
+  const callbacks = useRef({ onModeChange, onModeSelect });
+  callbacks.current = { onModeChange, onModeSelect };
+  const [index, setIndex] = useState(0),
+    [width, setWidth] = useState(310);
+  const rotation = useRef(new Animated.Value(0)).current,
+    transition = useRef(new Animated.Value(1)).current;
+  const raw = useRef(0),
+    lastPointer = useRef(0),
+    center = useRef({ x: 0, y: 0 }),
+    wheel = useRef<View>(null),
+    timer = useRef<ReturnType<typeof setTimeout> | null>(null),
+    selected = useRef(0),
+    pointerReady = useRef(false);
+  const size = Math.min(280, width - 4),
+    mode = dialModes[index],
+    theme = themes[mode];
+  useEffect(() => {
+    if (activeMode) {
+      const next = dialModes.indexOf(activeMode);
+      if (selected.current !== next) {
+        const value = angleForIndex(raw.current, next);
+        raw.current = value;
+        rotation.setValue(value);
+        selected.current = next;
+        setIndex(next);
+      }
+    }
+  }, [activeMode]);
+  const update = (angle: number) => {
+    raw.current = angle;
+    rotation.setValue(angle);
+    const next = modeIndex(angle);
+    if (next !== selected.current) {
+      selected.current = next;
+      setIndex(next);
+      callbacks.current.onModeChange?.(dialModes[next]);
+    }
+  };
+  const snap = () => {
+    const value = snapAngle(raw.current);
+    raw.current = value;
+    Animated.spring(rotation, {
+      toValue: value,
+      useNativeDriver: Platform.OS !== "web",
+      damping: 18,
+      stiffness: 150,
+      mass: 0.7,
+    }).start();
+    onDragState?.(false);
+    callbacks.current.onModeSelect?.(dialModes[modeIndex(value)]);
+  };
+  const choose = (next: number) => {
+    const value = angleForIndex(
+      raw.current,
+      (next + dialModes.length) % dialModes.length,
+    );
+    raw.current = value;
+    selected.current = modeIndex(value);
+    setIndex(selected.current);
+    callbacks.current.onModeChange?.(dialModes[selected.current]);
+    callbacks.current.onModeSelect?.(dialModes[selected.current]);
+    Animated.spring(rotation, {
+      toValue: value,
+      useNativeDriver: Platform.OS !== "web",
+      damping: 18,
+      stiffness: 150,
+      mass: 0.7,
+    }).start();
+  };
+  useEffect(() => {
+    transition.setValue(0.85);
+    Animated.timing(transition, {
+      toValue: 1,
+      duration: 240,
+      useNativeDriver: Platform.OS !== "web",
+    }).start();
+  }, [index]);
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+      onDragState?.(false);
+    },
+    [],
+  );
+  const responder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (e) => {
+        pointerReady.current = false;
+        const point = { x: e.nativeEvent.pageX, y: e.nativeEvent.pageY };
+        rotation.stopAnimation((v) => {
+          raw.current = v;
+        });
+        onDragState?.(true);
+        wheel.current?.measureInWindow((x, y, w, h) => {
+          center.current = { x: x + w / 2, y: y + h / 2 };
+          lastPointer.current =
+            (Math.atan2(
+              point.y - center.current.y,
+              point.x - center.current.x,
+            ) *
+              180) /
+            Math.PI;
+          pointerReady.current = true;
+        });
+      },
+      onPanResponderMove: (e) => {
+        if (!pointerReady.current) return;
+        const a =
+          (Math.atan2(
+            e.nativeEvent.pageY - center.current.y,
+            e.nativeEvent.pageX - center.current.x,
+          ) *
+            180) /
+          Math.PI;
+        update(raw.current + shortestDelta(lastPointer.current, a));
+        lastPointer.current = a;
+      },
+      onPanResponderRelease: snap,
+      onPanResponderTerminate: snap,
+    }),
+  ).current;
+  const rotate = rotation.interpolate({
+    inputRange: [-36000, 36000],
+    outputRange: ["-36000deg", "36000deg"],
+  });
+  return (
+    <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={s.root}>
+      <View style={[s.scene, { backgroundColor: theme.bg }]}>
+        <View style={s.heading}>
+          <Text style={[s.eyebrow, { color: theme.accent }]}>
+            {theme.label}
+          </Text>
+          <Text style={s.step}>
+            0{index + 1} / {String(dialModes.length).padStart(2, "0")}
+          </Text>
+        </View>
+        <Animated.View
+          style={{ opacity: transition, transform: [{ scale: transition }] }}
+        >
+          <BlockyActivity mode={mode} language={language} />
+          {greeting && (
+            <View
+              pointerEvents="none"
+              accessibilityLabel={`블로키의 인사: ${greeting}`}
+              style={s.greeting}
+            >
+              <Text style={s.greetingText}>{greeting}</Text>
+              <View style={s.bubbleTail} />
+            </View>
+          )}
+        </Animated.View>
+        <Text style={[s.mode, { color: theme.accent }]}>{modeName(mode)}</Text>
+        <Text style={s.description}>{theme.description}</Text>
+        {
+          <>
+            <Text style={s.help}>반원 다이얼을 돌려 모드를 바꿔보세요</Text>
+            <View style={[s.halfDial, { width: size, height: size / 2 + 8 }]}>
+              <View
+                style={[
+                  s.pointer,
+                  { left: size / 2 - 4, backgroundColor: theme.accent },
+                ]}
+              />
+              <View
+                ref={wheel}
+                {...responder.panHandlers}
+                accessibilityRole="adjustable"
+                accessibilityLabel={`반원 모듈 다이얼, 현재 ${mode}`}
+                accessibilityActions={[
+                  { name: "increment", label: "다음 모듈" },
+                  { name: "decrement", label: "이전 모듈" },
+                ]}
+                onAccessibilityAction={(e) =>
+                  choose(
+                    index + (e.nativeEvent.actionName === "increment" ? 1 : -1),
+                  )
+                }
+                style={
+                  {
+                    width: size,
+                    height: size,
+                    marginTop: 8,
+                    touchAction: "none",
+                  } as any
+                }
+                {...(Platform.OS === "web"
+                  ? {
+                      onWheel: (e: any) => {
+                        e.preventDefault?.();
+                        update(
+                          raw.current -
+                            (e.nativeEvent?.deltaY ?? e.deltaY ?? 0) * 0.35,
+                        );
+                        if (timer.current) clearTimeout(timer.current);
+                        timer.current = setTimeout(snap, 180);
+                      },
+                    }
+                  : {})}
+              >
+                <Animated.View
+                  style={{ width: size, height: size, transform: [{ rotate }] }}
+                >
+                  <Svg width={size} height={size} viewBox="0 0 280 280">
+                    <Circle
+                      cx="140"
+                      cy="140"
+                      r="132"
+                      fill="#FFFFFF"
+                      fillOpacity={0.85}
+                      stroke="#FFFFFF"
+                      strokeWidth="1"
+                    />
+                    <Circle
+                      cx="140"
+                      cy="140"
+                      r="73"
+                      fill={theme.bg}
+                      stroke="#D4DDD3"
+                      strokeWidth="1"
+                    />
+                    {Array.from({ length: 50 }, (_, i) => {
+                      const a = (i * Math.PI) / 25;
+                      return (
+                        <Line
+                          key={i}
+                          x1={140 + Math.sin(a) * 119}
+                          y1={140 - Math.cos(a) * 119}
+                          x2={140 + Math.sin(a) * (i % 10 === 0 ? 108 : 114)}
+                          y2={140 - Math.cos(a) * (i % 10 === 0 ? 108 : 114)}
+                          stroke={i % 10 === 0 ? theme.accent : "#C8D2C6"}
+                          strokeWidth={i % 10 === 0 ? 2.5 : 1}
+                        />
+                      );
+                    })}
+                  </Svg>
+                </Animated.View>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`${modeName(mode)} 설정 열기`}
+                onPress={() => callbacks.current.onModeSelect?.(mode)}
+                style={[s.topMode, { left: size / 2 - 30, top: 34 }]}
+              >
+                <Text style={[s.symbol, { color: theme.accent }]}>
+                  {theme.symbol}
+                </Text>
+                <Text style={[s.label, { color: theme.accent }]}>
+                  {modeName(mode)}
+                </Text>
+              </Pressable>
+              <Pressable
+                accessibilityLabel={`이전 모드 ${dialModes[(index + dialModes.length - 1) % dialModes.length]}`}
+                onPress={() => choose(index - 1)}
+                style={[s.neighbor, { left: 12, top: size * 0.3 }]}
+              >
+                <Text style={s.neighborIcon}>
+                  {
+                    themes[
+                      dialModes[
+                        (index + dialModes.length - 1) % dialModes.length
+                      ]
+                    ].symbol
+                  }
+                </Text>
+              </Pressable>
+              <Pressable
+                accessibilityLabel={`다음 모드 ${dialModes[(index + 1) % dialModes.length]}`}
+                onPress={() => choose(index + 1)}
+                style={[s.neighbor, { right: 12, top: size * 0.3 }]}
+              >
+                <Text style={s.neighborIcon}>
+                  {themes[dialModes[(index + 1) % dialModes.length]].symbol}
+                </Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`${modeName(mode)} 시간과 취향 설정`}
+                onPress={() => callbacks.current.onModeSelect?.(mode)}
+                style={[s.turnHint, { left: size / 2 - 45, top: size * 0.38 }]}
+              >
+                <Text style={s.turnHintText}>설정 열기</Text>
+              </Pressable>
+            </View>
+          </>
+        }
+      </View>
+    </View>
+  );
 }
-const s=StyleSheet.create({greeting:{position:'absolute',right:-18,top:9,zIndex:3,backgroundColor:'#FFFFFF',borderRadius:18,paddingHorizontal:16,paddingVertical:11,shadowColor:'#245C56',shadowOffset:{width:0,height:3},shadowOpacity:0.08,shadowRadius:8,elevation:3},greetingText:{fontSize:15,fontWeight:'800',color:'#245C56'},bubbleTail:{position:'absolute',bottom:-5,left:20,width:13,height:13,backgroundColor:'white',transform:[{rotate:'45deg'}]},root:{gap:16},scene:{borderRadius:28,padding:18,paddingBottom:0,alignItems:'center',overflow:'hidden'},integratedSummary:{width:'100%',paddingVertical:12,marginTop:10,borderTopWidth:1,borderTopColor:'#FFFFFF80'},halfDial:{alignSelf:'center',overflow:'hidden',marginTop:12,position:'relative'},topMode:{position:'absolute',width:60,minHeight:44,alignItems:'center',gap:3},neighbor:{position:'absolute',width:44,height:44,alignItems:'center',justifyContent:'center',borderRadius:22},neighborIcon:{fontSize:24,color:'#7B8D83'},turnHint:{position:'absolute',width:90,minHeight:44,alignItems:'center',justifyContent:'center'},turnHintText:{fontSize:10,color:'#7B8D83'},heading:{width:'100%',flexDirection:'row',justifyContent:'space-between',alignItems:'center'},eyebrow:{fontSize:10,fontWeight:'800',letterSpacing:1.1},step:{fontSize:11,color:'#626C67'},characterStage:{width:'100%',alignItems:'center',justifyContent:'center',position:'relative'},word:{position:'absolute',fontWeight:'800'},breathe:{position:'absolute',width:200,height:200,borderRadius:100,borderWidth:2},shadow:{position:'absolute',height:8,borderRadius:50,bottom:6,opacity:0.12},mode:{fontSize:27,fontWeight:'800',marginTop:4},description:{fontSize:12,lineHeight:20,color:'#626C67',marginTop:8,textAlign:'center'},dialSection:{gap:12,paddingVertical:20,paddingHorizontal:10,backgroundColor:'#EEE9DF',borderRadius:28},help:{marginTop:8,fontSize:12,color:'#626C67',textAlign:'center'},pointer:{position:'absolute',top:0,width:10,height:16,borderRadius:5,backgroundColor:'#245C56',zIndex:3},dialLabel:{position:'absolute',width:60,height:44,alignItems:'center',justifyContent:'center',gap:3},symbol:{fontSize:22,fontWeight:'700'},label:{fontSize:10,color:'#8B948D'},center:{position:'absolute',width:100,height:78,alignItems:'center',justifyContent:'center',gap:5},centerIcon:{fontSize:28,fontWeight:'800'},centerLabel:{fontSize:8,letterSpacing:1.2,color:'#626C67'},navigation:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:28},arrow:{width:44,height:44,borderRadius:22,backgroundColor:'#E8EEE9',alignItems:'center',justifyContent:'center'},arrowText:{fontSize:28,color:'#245C56'},dots:{flexDirection:'row',gap:7,alignItems:'center'},dot:{width:6,height:6,borderRadius:4,backgroundColor:'#D2D9D1'},duration:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',padding:16,borderRadius:18,backgroundColor:'white'},durationLabel:{fontSize:13,color:'#626C67'},timeRow:{flexDirection:'row',gap:12,alignItems:'center'},timeButton:{width:42,height:42,borderRadius:13,backgroundColor:'#EDF1E9',alignItems:'center',justifyContent:'center'},timeButtonText:{fontSize:23,color:'#245C56'},minutes:{fontSize:22,fontWeight:'700',color:'#245C56'},add:{padding:18,borderRadius:16,alignItems:'center',minHeight:54},addText:{fontSize:15,fontWeight:'700',color:'white'}});
+const s = StyleSheet.create({
+  greeting: {
+    position: "absolute",
+    right: -18,
+    top: 9,
+    zIndex: 3,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+    shadowColor: "#245C56",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  greetingText: { fontSize: 15, fontWeight: "800", color: "#245C56" },
+  bubbleTail: {
+    position: "absolute",
+    bottom: -5,
+    left: 20,
+    width: 13,
+    height: 13,
+    backgroundColor: "white",
+    transform: [{ rotate: "45deg" }],
+  },
+  root: { gap: 16 },
+  scene: {
+    borderRadius: 28,
+    padding: 18,
+    paddingBottom: 0,
+    alignItems: "center",
+    overflow: "hidden",
+  },
+  halfDial: {
+    alignSelf: "center",
+    overflow: "hidden",
+    marginTop: 12,
+    position: "relative",
+  },
+  topMode: {
+    position: "absolute",
+    width: 60,
+    minHeight: 44,
+    alignItems: "center",
+    gap: 3,
+  },
+  neighbor: {
+    position: "absolute",
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 22,
+  },
+  neighborIcon: { fontSize: 24, color: "#7B8D83" },
+  turnHint: {
+    position: "absolute",
+    width: 90,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  turnHintText: { fontSize: 10, color: "#7B8D83" },
+  heading: {
+    width: "100%",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  eyebrow: { fontSize: 10, fontWeight: "800", letterSpacing: 1.1 },
+  step: { fontSize: 11, color: "#626C67" },
+  characterStage: {
+    width: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  word: { position: "absolute", fontWeight: "800" },
+  breathe: {
+    position: "absolute",
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    borderWidth: 2,
+  },
+  shadow: {
+    position: "absolute",
+    height: 8,
+    borderRadius: 50,
+    bottom: 6,
+    opacity: 0.12,
+  },
+  mode: { fontSize: 27, fontWeight: "800", marginTop: 4 },
+  description: {
+    fontSize: 12,
+    lineHeight: 20,
+    color: "#626C67",
+    marginTop: 8,
+    textAlign: "center",
+  },
+  help: { marginTop: 8, fontSize: 12, color: "#626C67", textAlign: "center" },
+  pointer: {
+    position: "absolute",
+    top: 0,
+    width: 10,
+    height: 16,
+    borderRadius: 5,
+    backgroundColor: "#245C56",
+    zIndex: 3,
+  },
+  symbol: { fontSize: 22, fontWeight: "700" },
+  label: { fontSize: 10, color: "#8B948D" },
+});
