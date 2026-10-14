@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Linking,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -58,6 +59,7 @@ export default function PodcastSettings({
     [adding, setAdding] = useState(false),
     [manage, setManage] = useState(libraryOnly);
   const [refresh, setRefresh] = useState(0);
+  const [episodesOpen, setEpisodesOpen] = useState(false);
   const alive = useRef(true);
   useEffect(() => {
     alive.current = true;
@@ -68,6 +70,7 @@ export default function PodcastSettings({
   useEffect(() => {
     const controller = new AbortController();
     let current = true;
+    setEpisodesOpen(false);
     setFeed(null);
     setError("");
     if (!source) {
@@ -244,33 +247,74 @@ export default function PodcastSettings({
               표시해요. 휴대폰 앱은 원본 RSS에 직접 연결해요.
             </Text>
           )}
-          {!autoPlay &&
-            !libraryOnly &&
-            feed.episodes.slice(0, 5).map((e) => (
+          {!autoPlay && !libraryOnly && (
+            <>
               <Pressable
-                accessibilityRole="radio"
-                accessibilityState={{ selected: episode?.id === e.id }}
-                key={e.id}
-                onPress={() =>
-                  onSelect(
-                    { podcastId: source.id, episodeId: e.id, episode: e },
-                    feed.name,
-                  )
+                accessibilityRole="button"
+                accessibilityState={{ expanded: episodesOpen }}
+                accessibilityLabel={
+                  episodesOpen ? "에피소드 목록 접기" : "다른 에피소드 선택"
                 }
-                style={[
-                  styles.episode,
-                  episode?.id === e.id && styles.selectedEpisode,
-                ]}
+                onPress={() => setEpisodesOpen((open) => !open)}
+                style={styles.episodeToggle}
               >
-                <Text style={styles.episodeTitle}>{e.title}</Text>
-                <Text style={styles.note}>
-                  {e.publishedAt
-                    ? new Date(e.publishedAt).toLocaleDateString("ko-KR")
-                    : "날짜 미제공"}
-                  {e.duration ? ` · ${Math.round(e.duration / 60)}분` : ""}
+                <Text style={styles.link}>
+                  {episodesOpen ? "에피소드 목록 접기" : "다른 에피소드 선택"}
                 </Text>
+                <Text style={styles.link}>{episodesOpen ? "⌃" : "⌄"}</Text>
               </Pressable>
-            ))}
+              {episodesOpen && (
+                <ScrollView
+                  nestedScrollEnabled
+                  style={styles.episodeList}
+                  contentContainerStyle={{ padding: 4 }}
+                >
+                  {feed.episodes.slice(0, 5).map((e) => (
+                    <Pressable
+                      key={e.id}
+                      accessibilityRole="radio"
+                      accessibilityLabel={e.title}
+                      accessibilityState={{ selected: episode?.id === e.id }}
+                      onPress={() => {
+                        onSelect(
+                          { podcastId: source.id, episodeId: e.id, episode: e },
+                          feed.name,
+                        );
+                        setEpisodesOpen(false);
+                      }}
+                      style={[
+                        styles.episode,
+                        episode?.id === e.id && styles.selectedEpisode,
+                      ]}
+                    >
+                      <View style={{ flex: 1, gap: 2 }}>
+                        <Text
+                          numberOfLines={1}
+                          ellipsizeMode="tail"
+                          style={styles.episodeTitle}
+                        >
+                          {e.title}
+                        </Text>
+                        <Text style={styles.note}>
+                          {e.publishedAt
+                            ? new Date(e.publishedAt).toLocaleDateString(
+                                "ko-KR",
+                              )
+                            : "날짜 미제공"}
+                          {e.duration
+                            ? ` · ${Math.round(e.duration / 60)}분`
+                            : ""}
+                        </Text>
+                      </View>
+                      <Text style={styles.selectionMark}>
+                        {episode?.id === e.id ? "✓" : "○"}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              )}
+            </>
+          )}
         </>
       )}
       {episode && source && !libraryOnly && (
@@ -335,12 +379,37 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-  episode: {
-    padding: 14,
-    borderRadius: 13,
+  episodeToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    minHeight: 44,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: "#F0EEF7",
+  },
+  episodeList: {
+    maxHeight: 220,
     borderWidth: 1,
     borderColor: "#E4E7DF",
-    gap: 6,
+    borderRadius: 13,
+  },
+  selectionMark: {
+    fontSize: 17,
+    color: "#686096",
+    width: 20,
+    textAlign: "center",
+  },
+  episode: {
+    flexDirection: "row",
+    alignItems: "center",
+    minHeight: 60,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: "transparent",
+    gap: 8,
   },
   selectedEpisode: { borderColor: "#686096", backgroundColor: "#F0EEF7" },
   episodeTitle: {
