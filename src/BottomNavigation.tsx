@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Svg, { Path, Rect } from "react-native-svg";
-export type MainMenu = "오늘" | "내 루틴" | "기록" | "모닝콜";
+export type MainMenu = "오늘" | "내 루틴" | "기록" | "모닝콜" | "설정";
 function Icon({ menu, active }: { menu: MainMenu; active: boolean }) {
   const color = active ? "#245C56" : "#7D8782";
   return (
@@ -30,6 +30,14 @@ function Icon({ menu, active }: { menu: MainMenu; active: boolean }) {
         <>
           <Path d="M5 4h14v17l-7-4-7 4V4Z" />
           <Path d="m9 10 2 2 4-4" />
+        </>
+      ) : menu === "설정" ? (
+        <>
+          <Path
+            d="M9 3h6l.7 3 2.6 1.5 2.9-.9 3 5.2-2.2 2.1v3l2.2 2.1-3 5.2-2.9-.9L15.7 22l-.7 3H9l-.7-3-2.6-1.5-2.9.9-3-5.2L2 16.1v-3L-.2 11l3-5.2 2.9.9L8.3 5.2 9 3Z"
+            transform="translate(3 0) scale(.75)"
+          />
+          <Path d="M15.5 12a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0Z" />
         </>
       ) : (
         <>
@@ -93,13 +101,14 @@ export default function BottomNavigation({
         </Pressable>
         {item("기록")}
         {item("모닝콜")}
+        {item("설정")}
       </View>
     </View>
   );
 }
 const s = StyleSheet.create({
   container: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingTop: 12,
     paddingBottom: 8,
     backgroundColor: "#F7F4EE",
@@ -108,8 +117,8 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 4,
-    padding: 8,
+    gap: 2,
+    padding: 6,
     minHeight: 78,
     backgroundColor: "#FFFFFF",
     borderRadius: 27,
@@ -124,6 +133,7 @@ const s = StyleSheet.create({
   item: {
     flex: 1,
     minHeight: 58,
+    minWidth: 44,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 18,
@@ -134,13 +144,13 @@ const s = StyleSheet.create({
   label: { fontSize: 10, fontWeight: "500", color: "#7D8782" },
   activeLabel: { color: "#245C56", fontWeight: "800" },
   create: {
-    width: 54,
-    height: 54,
+    width: 48,
+    height: 48,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 27,
+    borderRadius: 24,
     backgroundColor: "#245C56",
-    marginHorizontal: 5,
+    marginHorizontal: 2,
     marginTop: -22,
     borderWidth: 4,
     borderColor: "#F7F4EE",

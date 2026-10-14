@@ -132,6 +132,12 @@ export default function PodcastSettings({
       {!autoPlay && (
         <>
           <Text style={styles.label}>내 팟캐스트 채널</Text>
+          {!sources.length && !libraryOnly && (
+            <Text style={styles.note}>
+              등록된 채널이 없어요. 하단 설정 → 팟캐스트 추가·관리에서 채널을
+              추가해 주세요.
+            </Text>
+          )}
           {sources.map((s) => (
             <View key={s.id} style={styles.sourceRow}>
               <Pressable
@@ -159,7 +165,7 @@ export default function PodcastSettings({
                   {s.name}
                 </Text>
               </Pressable>
-              {manage && (
+              {libraryOnly && manage && (
                 <Pressable
                   accessibilityLabel={`${s.name} 삭제`}
                   onPress={() => {
@@ -182,12 +188,17 @@ export default function PodcastSettings({
               )}
             </View>
           ))}
-          <Pressable style={styles.manage} onPress={() => setManage((v) => !v)}>
-            <Text style={styles.link}>
-              {manage ? "RSS 관리 접기" : "＋ RSS 채널 추가·관리"}
-            </Text>
-          </Pressable>
-          {manage && (
+          {libraryOnly && (
+            <Pressable
+              style={styles.manage}
+              onPress={() => setManage((v) => !v)}
+            >
+              <Text style={styles.link}>
+                {manage ? "RSS 관리 접기" : "＋ RSS 채널 추가·관리"}
+              </Text>
+            </Pressable>
+          )}
+          {libraryOnly && manage && (
             <View style={styles.form}>
               <Text style={styles.label}>공개 RSS 주소 추가</Text>
               <TextInput

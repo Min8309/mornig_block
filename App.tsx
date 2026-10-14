@@ -133,7 +133,9 @@ export default function App() {
     setSources: setPodcastSources,
     error: podcastLibraryError,
   } = usePodcastLibrary();
-  const [podcastLibraryOpen, setPodcastLibraryOpen] = useState(false);
+  const [settingsPanel, setSettingsPanel] = useState<
+    "voice" | "podcasts" | null
+  >(null);
 
   const scrollRef = useRef<ScrollView>(null),
     scrollOffset = useRef(0),
@@ -185,7 +187,7 @@ export default function App() {
     [selected, setSelected] = useState("weekday"),
     [records, setRecords] = useState<RecordItem[]>([]),
     [ready, setReady] = useState(false),
-    [tab, setTab] = useState<"오늘" | "내 루틴" | "기록">("오늘");
+    [tab, setTab] = useState<"오늘" | "내 루틴" | "기록" | "설정">("오늘");
   const [podcastCueReady, setPodcastCueReady] = useState(false);
   const [draft, setDraft] = useState<Routine | null>(null),
     [today, setToday] = useState<Routine | null>(null),
@@ -256,7 +258,7 @@ export default function App() {
     return listenForCall((id) => {
       const target = routines.find((r) => r.id === id);
       if (target) {
-        setPodcastLibraryOpen(false);
+        setSettingsPanel(null);
         setSelected(id);
         setToday(null);
         setTab("오늘");
@@ -442,12 +444,13 @@ export default function App() {
       ],
     };
     setCallOpen(false);
-    setPodcastLibraryOpen(false);
+    setSettingsPanel(null);
     setDraft(r);
     setTodayOnly(false);
   };
   const selectMenu = (menu: MainMenu) => {
-    setPodcastLibraryOpen(false);
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+    setSettingsPanel(null);
     if (menu === "모닝콜") setCallOpen(true);
     else {
       setCallOpen(false);
@@ -664,7 +667,7 @@ export default function App() {
           blocks={active.blocks.length}
           editingDisabled={!!draft || playing}
           onEdit={() => {
-            setPodcastLibraryOpen(false);
+            setSettingsPanel(null);
             setCallOpen(false);
             setDone(false);
             edit(true);
@@ -690,7 +693,7 @@ export default function App() {
           }}
           contentContainerStyle={styles.content}
         >
-          {podcastLibraryOpen ? (
+          {settingsPanel === "podcasts" ? (
             <>
               <Text style={styles.title}>내 팟캐스트 RSS</Text>
               <PodcastSettings
@@ -704,7 +707,7 @@ export default function App() {
               {podcastLibraryError && (
                 <Text style={styles.notice}>{podcastLibraryError}</Text>
               )}
-              {button("내 루틴으로", () => setPodcastLibraryOpen(false), true)}
+              {button("설정으로 돌아가기", () => setSettingsPanel(null), true)}
             </>
           ) : callOpen ? (
             <MorningCallScreen
@@ -1084,6 +1087,57 @@ export default function App() {
                 동작해요.
               </Text>
             </>
+          ) : tab === "설정" ? (
+            <>
+              <Text style={styles.eyebrow}>나에게 맞는 아침</Text>
+              <Text style={styles.title}>설정</Text>
+              {settingsPanel === "voice" ? (
+                <>
+                  <VoiceSettings />
+                  {button(
+                    "설정으로 돌아가기",
+                    () => setSettingsPanel(null),
+                    true,
+                  )}
+                </>
+              ) : (
+                <>
+                  <Text style={styles.muted}>
+                    아침 목소리와 즐겨 듣는 채널을 관리해요.
+                  </Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    style={styles.card}
+                    onPress={() => setSettingsPanel("voice")}
+                  >
+                    <View style={styles.row}>
+                      <Text style={styles.icon}>♫</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.cardTitle}>목소리 설정</Text>
+                        <Text style={styles.muted}>
+                          남성·여성 음성, 언어별 목소리와 미리 듣기
+                        </Text>
+                      </View>
+                      <Text style={styles.link}>→</Text>
+                    </View>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    style={styles.card}
+                    onPress={() => setSettingsPanel("podcasts")}
+                  >
+                    <View style={styles.row}>
+                      <Text style={styles.icon}>◉</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.cardTitle}>팟캐스트 추가·관리</Text>
+                        <Text style={styles.muted}>RSS 채널 등록과 삭제</Text>
+                      </View>
+                      <Text style={styles.link}>→</Text>
+                    </View>
+                  </Pressable>
+                </>
+              )}
+            </>
           ) : tab === "내 루틴" ? (
             <>
               <Text style={styles.eyebrow}>원하는 만큼, 원하는 순서로</Text>
@@ -1116,12 +1170,6 @@ export default function App() {
                 </Pressable>
               ))}
               {button("선택한 루틴 편집", () => edit())}
-              <VoiceSettings />
-              {button(
-                "팟캐스트 RSS 추가·관리",
-                () => setPodcastLibraryOpen(true),
-                true,
-              )}
               {button("+ 새 루틴 만들기", createRoutine, true)}
               {routines.length > 1 &&
                 button(
