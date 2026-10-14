@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: morningblock-voice
+    runtime: node
+    plan: free
+    buildCommand: node --check server/tts.mjs
+    startCommand: node server/tts.mjs
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: TTS_ACCESS_TOKEN
+        generateValue: true
+      - key: TTS_ALLOWED_ORIGINS
+        value: https://morningblock-ui-preview.minsunpark3421.chatgpt.site

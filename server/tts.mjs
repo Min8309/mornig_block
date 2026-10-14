@@ -4,9 +4,10 @@ import { randomUUID, timingSafeEqual } from "node:crypto";
 const {
   OPENAI_API_KEY,
   TTS_ACCESS_TOKEN,
-  PUBLIC_BASE_URL,
   TTS_ALLOWED_ORIGINS = "",
 } = process.env;
+const PUBLIC_BASE_URL =
+  process.env.PUBLIC_BASE_URL || process.env.RENDER_EXTERNAL_URL;
 if (
   !OPENAI_API_KEY ||
   !TTS_ACCESS_TOKEN ||
