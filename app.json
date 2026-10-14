@@ -11,7 +11,10 @@
       "bundleIdentifier": "com.morningblock.app"
     },
     "android": {
-      "package": "com.morningblock.app"
+      "package": "com.morningblock.app",
+      "permissions": [
+        "android.permission.SCHEDULE_EXACT_ALARM"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -20,6 +23,9 @@
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#F7F4EE"
-    }
+    },
+    "plugins": [
+      "expo-notifications"
+    ]
   }
 }

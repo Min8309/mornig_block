@@ -5,16 +5,17 @@
   "version": "0.1.0",
   "main": "index.ts",
   "dependencies": {
+    "@expo/metro-runtime": "~57.0.16",
+    "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "~57.0.28",
+    "expo-notifications": "~57.0.22",
+    "expo-speech": "~57.0.3",
     "expo-status-bar": "~57.0.1",
     "react": "19.2.3",
-    "react-native": "0.86.3",
-    "expo-speech": "~57.0.3",
-    "react-native-safe-area-context": "~5.7.0",
-    "@react-native-async-storage/async-storage": "2.2.0",
     "react-dom": "19.2.3",
-    "react-native-web": "~0.21.0",
-    "@expo/metro-runtime": "~57.0.16"
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-web": "~0.21.0"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
@@ -25,7 +26,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node tests/morning-call.test.cjs"
   },
   "private": true
 }
