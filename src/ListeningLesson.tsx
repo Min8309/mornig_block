@@ -54,10 +54,6 @@ export default function ListeningLesson({ config }: { config: StudyConfig }) {
           {lesson.explanation}
         </Text>
       )}
-      <Text style={s.note}>
-        첫 버전의 언어별·단계별 기본 레슨이에요. 음성은 기기의 해당 언어 TTS를
-        사용해요.
-      </Text>
     </View>
   );
 }

@@ -37,7 +37,7 @@ import PodcastSettings from "./src/PodcastSettings";
 import { PodcastEpisode } from "./src/podcasts";
 import { usePodcastLibrary } from "./src/usePodcastLibrary";
 import RecordsScreen from "./src/RecordsScreen";
-import { RoutineRecord } from "./src/records-model";
+import { loadRecords, RoutineRecord } from "./src/records-model";
 import { formatTime } from "./src/time-model";
 import ModuleDial, { BlockyActivity } from "./src/ModuleDial";
 import { DialMode } from "./src/dial-model";
@@ -124,10 +124,6 @@ function guide(b: Block) {
   switch (b.kind) {
     case "스트레칭":
       return "천천히 몸을 일으켜 주세요. 편안한 범위에서 어깨를 뒤로 돌리고, 양팔을 가볍게 뻗어 보세요. 통증이 느껴지면 멈추고 쉬세요.";
-    case "뉴스":
-      return "선택한 분야의 공개 RSS 뉴스를 불러오고 있어요.";
-    case "영어":
-      return "오늘의 표현은 Take your time. 서두르지 않아도 괜찮아요라는 뜻입니다. 천천히 따라 말해 보세요. Take your time.";
     case "명상":
       return "편안하게 앉아 숨을 자연스럽게 쉬어 주세요. 호흡을 억지로 바꾸지 않고, 들어오고 나가는 숨을 느껴 보세요. 잠시 조용히 함께합니다.";
     case "낭독":
@@ -244,7 +240,7 @@ export default function App() {
               })),
             );
             setSelected(d.selected || d.routines[0].id);
-            setRecords(d.records || []);
+            setRecords(loadRecords(d.records));
           }
         }
       })
@@ -730,7 +726,7 @@ export default function App() {
               }}
               routines={routines}
               onSave={setCall}
-              onClose={() => setCallOpen(false)}
+              onClose={() => selectMenu("오늘")}
             />
           ) : draft ? (
             <>

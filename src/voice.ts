@@ -7,10 +7,12 @@ import {
 import * as NativeSpeech from "expo-speech";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 export type Voice = NativeSpeech.Voice;
+export const getAvailableDeviceVoicesAsync = () =>
+  NativeSpeech.getAvailableVoicesAsync();
 export const getAvailableVoicesAsync = () =>
   getCloudConfig().enabled
     ? Promise.resolve([] as Voice[])
-    : NativeSpeech.getAvailableVoicesAsync();
+    : getAvailableDeviceVoicesAsync();
 export const stop = () => {
   stopCloud();
   return NativeSpeech.stop();

@@ -27,7 +27,7 @@ export default function VoiceSettings() {
         if (alive) setCloud(c);
       })
       .catch(() => {});
-    Promise.all([Voice.getAvailableVoicesAsync(), Voice.loadVoiceChoices()])
+    Promise.all([Voice.getAvailableDeviceVoicesAsync(), Voice.loadVoiceChoices()])
       .then(([v, c]) => {
         if (alive) {
           setVoices(v);

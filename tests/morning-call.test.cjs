@@ -527,3 +527,35 @@ test("old notification cancellation failure preserves new schedule and reports a
   assert.equal(x.saved.length, 1);
   assert.ok(!x.cancelled.includes("new-1"));
 });
+
+test("stored records discard malformed entries and preserve legacy and actual progress", () => {
+  const records = load("src/records-model.ts");
+  const legacy = { date: "2026-10-14T00:00:00Z", name: "아침", minutes: 15 };
+  const current = { ...legacy, actualSeconds: 30 };
+  assert.equal(records.loadRecords({}).length, 0);
+  assert.equal(records.loadRecords(null).length, 0);
+  const restored = records.loadRecords([
+    null,
+    {},
+    { ...legacy, date: "invalid" },
+    { ...legacy, minutes: "15" },
+    { ...legacy, actualSeconds: -1 },
+    legacy,
+    current,
+  ]);
+  assert.equal(restored.length, 2);
+  assert.equal(restored[0], legacy);
+  assert.equal(restored[1], current);
+  assert.equal(records.recordStats(restored, "2026-10-14").minutes, 15.5);
+});
+
+test("device voice discovery remains available when cloud speech is enabled", async () => {
+  const voices = [{ identifier: "device-ko", language: "ko-KR", name: "한국어" }];
+  const api = load("src/voice.ts", {
+    "expo-speech": { getAvailableVoicesAsync: async () => voices },
+    "@react-native-async-storage/async-storage": {},
+    "./cloud-voice": { getCloudConfig: () => ({ enabled: true }) },
+  });
+  assert.equal((await api.getAvailableVoicesAsync()).length, 0);
+  assert.equal(await api.getAvailableDeviceVoicesAsync(), voices);
+});

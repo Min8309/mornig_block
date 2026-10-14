@@ -4,6 +4,21 @@ export type RoutineRecord = {
   name: string;
   actualSeconds?: number;
 };
+export function loadRecords(value: unknown): RoutineRecord[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(
+    (record): record is RoutineRecord =>
+      record !== null &&
+      typeof record === "object" &&
+      typeof record.date === "string" &&
+      Number.isFinite(Date.parse(record.date)) &&
+      typeof record.name === "string" &&
+      Number.isFinite(record.minutes) &&
+      record.minutes >= 0 &&
+      (record.actualSeconds === undefined ||
+        (Number.isFinite(record.actualSeconds) && record.actualSeconds >= 0)),
+  );
+}
 export function recordDay(date: string | Date) {
   const d = new Date(date);
   if (!Number.isFinite(d.getTime())) return "";
