@@ -1,3 +1,4 @@
+import { routineColor, nextRoutineColor } from "./src/routine-colors";
 import VoiceSettings from "./src/VoiceSettings";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -72,7 +73,13 @@ type Block = {
   episodeId?: string;
   episode?: PodcastEpisode;
 };
-type Routine = { id: string; name: string; time: string; blocks: Block[] };
+type Routine = {
+  id: string;
+  name: string;
+  time: string;
+  blocks: Block[];
+  color?: string;
+};
 type RecordItem = RoutineRecord;
 const options: Record<Kind, string[]> = {
   스트레칭: ["가볍게 몸 풀기", "목·어깨 풀기"],
@@ -183,7 +190,9 @@ export default function App() {
         showAlert("모닝콜 설정", "저장된 모닝콜 설정을 불러오지 못했어요."),
       );
   }, []);
-  const [routines, setRoutines] = useState<Routine[]>(initial),
+  const [routines, setRoutines] = useState<Routine[]>(() =>
+      initial.map((r, index) => ({ ...r, color: routineColor(index) })),
+    ),
     [selected, setSelected] = useState("weekday"),
     [records, setRecords] = useState<RecordItem[]>([]),
     [ready, setReady] = useState(false),
@@ -216,8 +225,9 @@ export default function App() {
           const d = JSON.parse(v);
           if (Array.isArray(d.routines) && d.routines.length) {
             setRoutines(
-              d.routines.map((r: Routine) => ({
+              d.routines.map((r: Routine, index: number) => ({
                 ...r,
+                color: r.color || routineColor(index),
                 blocks: r.blocks.map((b) =>
                   b.kind === "뉴스"
                     ? {
@@ -433,6 +443,7 @@ export default function App() {
     const r = {
       id: String(Date.now()),
       name: "여유 있는 아침",
+      color: nextRoutineColor(routines),
       time: "08:00",
       blocks: [
         {
@@ -1150,6 +1161,10 @@ export default function App() {
                   accessibilityLabel={`${r.name}, 메인에서 실행할 루틴으로 선택`}
                   style={[
                     styles.card,
+                    {
+                      backgroundColor:
+                        r.color || routineColor(routines.indexOf(r)),
+                    },
                     r.id === selected && styles.selectedCard,
                   ]}
                   onPress={() => {
