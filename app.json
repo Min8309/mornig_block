@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "모닝블록",
+    "slug": "morningblock",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.morningblock.app"
+    },
+    "android": {
+      "package": "com.morningblock.app"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
