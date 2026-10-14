@@ -20,3 +20,7 @@ const dial=load('src/dial-model.ts');
 test('dial maps both rotation directions and full revolutions to modules',()=>{assert.equal(dial.modeIndex(0),0);assert.equal(dial.modeIndex(-90),1);assert.equal(dial.modeIndex(-180),2);assert.equal(dial.modeIndex(-270),3);assert.equal(dial.modeIndex(-360),0);assert.equal(dial.modeIndex(90),3);assert.equal(dial.modeIndex(720),0)});
 test('dial crossing angle boundary has no full-circle jump',()=>{assert.equal(dial.shortestDelta(179,-179),2);assert.equal(dial.shortestDelta(-179,179),-2)});
 test('dial snaps to nearest category and arrows take closest path',()=>{assert.equal(dial.snapAngle(-98),-90);assert.equal(dial.snapAngle(172),180);assert.equal(dial.angleForIndex(-270,0),-360);assert.equal(dial.angleForIndex(0,3),90)});
+
+const reorder=load('src/reorder-model.ts');
+test('drag reorder preserves module data and leaves input unchanged',()=>{const a=[{id:'a',minutes:3},{id:'b',minutes:5},{id:'c',minutes:7}];const result=reorder.moveItem(a,0,2);assert.equal(result.map(x=>x.id).join(','),'b,c,a');assert.equal(result[2].minutes,3);assert.equal(a[0].id,'a')});
+test('drag target uses variable card heights and clamps list boundaries',()=>{const p=[{y:0,height:210},{y:222,height:260},{y:494,height:200}];assert.equal(reorder.dropIndex(p,0,300),1);assert.equal(reorder.dropIndex(p,0,1000),2);assert.equal(reorder.dropIndex(p,2,-1000),0);assert.equal(reorder.dropIndex(p,1,0),1)});
